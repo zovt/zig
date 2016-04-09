@@ -111,12 +111,10 @@ struct gz_header {
 }
 
 pub struct z_stream {
-    next_in: ?&const u8,  /* next input byte */
-    avail_in: u32,       /* number of bytes available at next_in */
+    input_buf: []u8,
     total_in: u32,       /* total number of input bytes read so far */
 
-    next_out: ?&u8,      /* next output byte should be put there */
-    avail_out: u32,      /* remaining free space at next_out */
+    output_buf: []u8,
     total_out: u32,      /* total number of bytes output so far */
 
     msg: []u8,           /* last error message, NULL if no error */
@@ -203,9 +201,9 @@ pub fn inflate(strm: &z_stream) -> %void {
   var state = &strm.state;
 
   var next: []u8 = undefined;      /* next input */
-  var put: &u8 = undefined;        /* next output */
+  var put: []u8 = undefined;       /* next output */
   // var have: u32 = undefined; now: next.len      /* available input and output */
-  var left: u32 = undefined;       /* available input and output */
+  //var left: u32 = undefined; now:put.len      /* available input and output */
   var hold: u32 = undefined;       /* bit buffer */
   var bits: u32 = undefined;       /* bits in bit buffer */
   var in: isize = undefined;       /* save starting available input and output */
@@ -218,21 +216,15 @@ pub fn inflate(strm: &z_stream) -> %void {
   var ret: %void = void{};         /* return code */
   var hbuf: [4]u8 = undefined;     /* buffer for gzip header crc calculation */
 
-  put = strm.next_out ?? return error.NullOutBuffer;
-  left = strm.avail_out;
-  next = if (strm.avail_in == 0) {
-    []u8{}
-  } else {
-    // TODO: shouldn't have to cast to isize
-    (strm.next_in ?? return error.NullInBuffer)[0...isize(strm.avail_in)]
-  };
+  put = strm.output_buf;
+  next = strm.input_buf;
   hold = state.hold;
   bits = state.bits;
 
   if (state.mode == inflate_mode.TYPE) state.mode = inflate_mode.TYPEDO;      /* skip check */
 
   in = next.len;
-  out = isize(left);
+  out = put.len;
   while (true) {
     switch (state.mode) {
       HEAD => {
@@ -872,6 +864,21 @@ fn test_inflate() {
 
   var strm: z_stream = undefined;
   inflateInit(&strm);
+
+  var output_buf: [0x1000]u8 = undefined;
+
+  const hello_str = "hello";
+  const hello_compressed = []u8 {
+    120, 156, 203, 72, 205, 201, 201, 7, 0, 6, 44, 2, 21,
+  };
+  strm.input_buf = hello_compressed;
+  strm.output_buf = output_buf;
+
+  inflate(&strm) %% |err| {
+    %%io.stdout.printf("got error: ");
+    %%io.stdout.printf(@err_name(err));
+    %%io.stdout.printf("\n");
+  };
 
   %%io.stdout.print_u64(@sizeof(z_stream));
   %%io.stdout.printf("\n");
