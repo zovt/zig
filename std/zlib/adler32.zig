@@ -1,8 +1,5 @@
 
-//const assert = @import("std").assert;
-fn assert(b:bool) {
-  if (!b) unreachable{}
-}
+const assert = @import("std").assert;
 
 const MOD_ADLER = 65521;
 
