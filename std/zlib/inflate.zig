@@ -1,4 +1,5 @@
 const io = @import("std").io;
+const str_eql = @import("std").str_eql;
 
 // TODO: import paths relative to package root when running tests on a specific file in the package
 const adler32 = @import("./adler32.zig").adler32;
@@ -185,19 +186,27 @@ const order = []u16{
 */
 /*
 while (bits < n) {
-  if (have == 0) goto inf_leave;
-  have -= 1;
-  hold += u32(*next) << bits;
-  next += 1;
+  if (next.len == 0) goto inf_leave;
+  hold += u32(next[0]) << bits;
+  next = next[1...];
   bits += 8;
 }
 */
 
+enum FlushMode {
+  Z_NO_FLUSH,
+  Z_PARTIAL_FLUSH,
+  Z_SYNC_FLUSH,
+  Z_FULL_FLUSH,
+  Z_FINISH,
+  Z_BLOCK,
+  Z_TREES,
+}
 
 fn BITS(hold: u32, n: u32) -> u32 {
     return hold & ((1 << n) - 1);
 }
-pub fn inflate(strm: &z_stream) -> %void {
+pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
   var state = &strm.state;
 
   var next: []u8 = undefined;      /* next input */
@@ -233,8 +242,7 @@ pub fn inflate(strm: &z_stream) -> %void {
           continue;
         }
         while (bits < 16) {
-          // TODO: goto
-          //if (next.len == 0) goto inf_leave;
+          if (next.len == 0) goto inf_leave;
           hold += u32(next[0]) << bits;
           next = next[1...];
           bits += 8;
@@ -439,72 +447,96 @@ pub fn inflate(strm: &z_stream) -> %void {
             }
             strm.adler = state.check = adler32(0L, Z_NULL, 0);
             state.mode = inflate_mode.TYPE;
-        case inflate_mode.TYPE:
-            if (flush == Z_BLOCK || flush == Z_TREES) goto inf_leave;
-        case inflate_mode.TYPEDO:
-            if (state.last) {
-                BYTEBITS();
-                state.mode = inflate_mode.CHECK;
-                continue;
+      */
+      TYPE => {
+        if (flush == FlushMode.Z_BLOCK || flush == FlushMode.Z_TREES) goto inf_leave;
+        state.mode = inflate_mode.TYPEDO;
+      },
+      TYPEDO => {
+        if (state.last) {
+          /* go to byte boundary */
+          hold >>= bits & 7;
+          bits -= bits & 7;
+          state.mode = inflate_mode.CHECK;
+          continue;
+        }
+        while (bits < 3) {
+          if (next.len == 0) goto inf_leave;
+          hold += u32(next[0]) << bits;
+          next = next[1...];
+          bits += 8;
+        }
+        state.last = BITS(hold, 1) != 0;
+        hold >>= 1;
+        bits -= 1;
+        switch (BITS(hold, 2)) {
+          0 => { /* stored block */
+            state.mode = inflate_mode.STORED;
+          },
+          1 => { /* fixed block */
+            fixedtables(state);
+            state.mode = inflate_mode.LEN_;             /* decode codes */
+            if (flush == FlushMode.Z_TREES) {
+              hold >>= 2;
+              bits -= 2;
+              goto inf_leave;
             }
-            NEEDBITS(3);
-            state.last = BITS(hold, 1);
-            hold >>= 1;
-            bits -= 1;
-            switch (BITS(hold, 2)) {
-            case 0:                             /* stored block */
-                state.mode = inflate_mode.STORED;
-                continue;
-            case 1:                             /* fixed block */
-                fixedtables(state);
-                state.mode = inflate_mode.LEN_;             /* decode codes */
-                if (flush == Z_TREES) {
-                    hold >>= 2;
-                    bits -= 2;
-                    goto inf_leave;
-                }
-                continue;
-            case 2:                             /* dynamic block */
-                state.mode = inflate_mode.TABLE;
-                continue;
-            case 3:
-                strm.msg = (char *)"invalid block type";
-                state.mode = inflate_mode.BAD;
-            }
-            hold >>= 2;
-            bits -= 2;
-            continue;
-        case inflate_mode.STORED:
-            BYTEBITS();                         /* go to byte boundary */
-            NEEDBITS(32);
-            if ((hold & 0xffff) != ((hold >> 16) ^ 0xffff)) {
-                strm.msg = (char *)"invalid stored block lengths";
-                state.mode = inflate_mode.BAD;
-                continue;
-            }
-            state.length = (unsigned)hold & 0xffff;
-            hold = 0;
-            bits = 0;
-            state.mode = inflate_mode.COPY_;
-            if (flush == Z_TREES) goto inf_leave;
-        case inflate_mode.COPY_:
-            state.mode = inflate_mode.COPY;
-        case inflate_mode.COPY:
-            copy = state.length;
-            if (copy) {
-                if (copy > have) copy = have;
-                if (copy > left) copy = left;
-                if (copy == 0) goto inf_leave;
-                zmemcpy(put, next, copy);
-                have -= copy;
-                next += copy;
-                left -= copy;
-                put += copy;
-                state.length -= copy;
-                continue;
-            }
-            state.mode = inflate_mode.TYPE;
-            continue;
+          },
+          2 => { /* dynamic block */
+            state.mode = inflate_mode.TABLE;
+          },
+          3 => {
+            strm.msg = "invalid block type";
+            state.mode = inflate_mode.BAD;
+          },
+          else => unreachable{},
+        }
+        hold >>= 2;
+        bits -= 2;
+        continue;
+      },
+      STORED => {
+        /* go to byte boundary */
+        hold >>= bits & 7;
+        bits -= bits & 7;
+        while (bits < 32) {
+          if (next.len == 0) goto inf_leave;
+          hold += u32(next[0]) << bits;
+          next = next[1...];
+          bits += 8;
+        }
+        if ((hold & 0xffff) != ((hold >> 16) ^ 0xffff)) {
+          strm.msg = "invalid stored block lengths";
+          state.mode = inflate_mode.BAD;
+          continue;
+        }
+        state.length = hold & 0xffff;
+        hold = 0;
+        bits = 0;
+        state.mode = inflate_mode.COPY_;
+        if (flush == FlushMode.Z_TREES) goto inf_leave;
+      },
+      COPY_ => {
+        state.mode = inflate_mode.COPY;
+      },
+      COPY => {
+        copy = state.length;
+        if (copy != 0) {
+          if (copy > have) copy = have;
+          if (copy > left) copy = left;
+          if (copy == 0) goto inf_leave;
+          zmemcpy(put, next, copy);
+          have -= copy;
+          next += copy;
+          left -= copy;
+          put += copy;
+          state.length -= copy;
+          continue;
+        }
+        state.mode = inflate_mode.TYPE;
+        continue;
+      },
+      /*
         case inflate_mode.TABLE:
             NEEDBITS(14);
             state.nlen = BITS(hold, 5) + 257;
@@ -632,7 +664,7 @@ pub fn inflate(strm: &z_stream) -> %void {
                 continue;
             }
             state.mode = inflate_mode.LEN_;
-            if (flush == Z_TREES) goto inf_leave;
+            if (flush == FlushMode.Z_TREES) goto inf_leave;
         case inflate_mode.LEN_:
             state.mode = inflate_mode.LEN;
         case inflate_mode.LEN:
@@ -831,12 +863,11 @@ pub fn inflate(strm: &z_stream) -> %void {
        error.  Call updatewindow() to create and/or update the window state.
        Note: a memory error from inflate() is non-recoverable.
      */
-  // TODO: goto
-  // inf_leave:
+  inf_leave:
   /*
     RESTORE();
     if (state.wsize || (out != strm.avail_out && state.mode < BAD &&
-            (state.mode < CHECK || flush != Z_FINISH)))
+            (state.mode < CHECK || flush != FlushMode.Z_FINISH)))
         if (updatewindow(strm, strm.next_out, out - strm.avail_out)) {
             state.mode = inflate_mode.MEM;
             return Z_MEM_ERROR;
@@ -852,10 +883,112 @@ pub fn inflate(strm: &z_stream) -> %void {
     strm.data_type = state.bits + (state.last ? 64 : 0) +
                       (state.mode == inflate_mode.TYPE ? 128 : 0) +
                       (state.mode == inflate_mode.LEN_ || state.mode == inflate_mode.COPY_ ? 256 : 0);
-    if (((in == 0 && out == 0) || flush == Z_FINISH) && ret == Z_OK)
+    if (((in == 0 && out == 0) || flush == FlushMode.Z_FINISH) && ret == Z_OK)
         ret = Z_BUF_ERROR;
-    return ret;
   */
+  return ret;
+}
+
+fn c(op: u8, bits: u8, val: u16) -> code {
+  return code{.op=op, .bits=bits, .val=val};
+}
+const lenfix = []code{
+  /*
+  c(96,7,0),c(0,8,80),c(0,8,16),c(20,8,115),c(18,7,31),c(0,8,112),c(0,8,48),
+  c(0,9,192),c(16,7,10),c(0,8,96),c(0,8,32),c(0,9,160),c(0,8,0),c(0,8,128),
+  c(0,8,64),c(0,9,224),c(16,7,6),c(0,8,88),c(0,8,24),c(0,9,144),c(19,7,59),
+  c(0,8,120),c(0,8,56),c(0,9,208),c(17,7,17),c(0,8,104),c(0,8,40),c(0,9,176),
+  c(0,8,8),c(0,8,136),c(0,8,72),c(0,9,240),c(16,7,4),c(0,8,84),c(0,8,20),
+  c(21,8,227),c(19,7,43),c(0,8,116),c(0,8,52),c(0,9,200),c(17,7,13),c(0,8,100),
+  c(0,8,36),c(0,9,168),c(0,8,4),c(0,8,132),c(0,8,68),c(0,9,232),c(16,7,8),
+  c(0,8,92),c(0,8,28),c(0,9,152),c(20,7,83),c(0,8,124),c(0,8,60),c(0,9,216),
+  c(18,7,23),c(0,8,108),c(0,8,44),c(0,9,184),c(0,8,12),c(0,8,140),c(0,8,76),
+  c(0,9,248),c(16,7,3),c(0,8,82),c(0,8,18),c(21,8,163),c(19,7,35),c(0,8,114),
+  c(0,8,50),c(0,9,196),c(17,7,11),c(0,8,98),c(0,8,34),c(0,9,164),c(0,8,2),
+  c(0,8,130),c(0,8,66),c(0,9,228),c(16,7,7),c(0,8,90),c(0,8,26),c(0,9,148),
+  c(20,7,67),c(0,8,122),c(0,8,58),c(0,9,212),c(18,7,19),c(0,8,106),c(0,8,42),
+  c(0,9,180),c(0,8,10),c(0,8,138),c(0,8,74),c(0,9,244),c(16,7,5),c(0,8,86),
+  c(0,8,22),c(64,8,0),c(19,7,51),c(0,8,118),c(0,8,54),c(0,9,204),c(17,7,15),
+  c(0,8,102),c(0,8,38),c(0,9,172),c(0,8,6),c(0,8,134),c(0,8,70),c(0,9,236),
+  c(16,7,9),c(0,8,94),c(0,8,30),c(0,9,156),c(20,7,99),c(0,8,126),c(0,8,62),
+  c(0,9,220),c(18,7,27),c(0,8,110),c(0,8,46),c(0,9,188),c(0,8,14),c(0,8,142),
+  c(0,8,78),c(0,9,252),c(96,7,0),c(0,8,81),c(0,8,17),c(21,8,131),c(18,7,31),
+  c(0,8,113),c(0,8,49),c(0,9,194),c(16,7,10),c(0,8,97),c(0,8,33),c(0,9,162),
+  c(0,8,1),c(0,8,129),c(0,8,65),c(0,9,226),c(16,7,6),c(0,8,89),c(0,8,25),
+  c(0,9,146),c(19,7,59),c(0,8,121),c(0,8,57),c(0,9,210),c(17,7,17),c(0,8,105),
+  c(0,8,41),c(0,9,178),c(0,8,9),c(0,8,137),c(0,8,73),c(0,9,242),c(16,7,4),
+  c(0,8,85),c(0,8,21),c(16,8,258),c(19,7,43),c(0,8,117),c(0,8,53),c(0,9,202),
+  c(17,7,13),c(0,8,101),c(0,8,37),c(0,9,170),c(0,8,5),c(0,8,133),c(0,8,69),
+  c(0,9,234),c(16,7,8),c(0,8,93),c(0,8,29),c(0,9,154),c(20,7,83),c(0,8,125),
+  c(0,8,61),c(0,9,218),c(18,7,23),c(0,8,109),c(0,8,45),c(0,9,186),c(0,8,13),
+  c(0,8,141),c(0,8,77),c(0,9,250),c(16,7,3),c(0,8,83),c(0,8,19),c(21,8,195),
+  c(19,7,35),c(0,8,115),c(0,8,51),c(0,9,198),c(17,7,11),c(0,8,99),c(0,8,35),
+  c(0,9,166),c(0,8,3),c(0,8,131),c(0,8,67),c(0,9,230),c(16,7,7),c(0,8,91),
+  c(0,8,27),c(0,9,150),c(20,7,67),c(0,8,123),c(0,8,59),c(0,9,214),c(18,7,19),
+  c(0,8,107),c(0,8,43),c(0,9,182),c(0,8,11),c(0,8,139),c(0,8,75),c(0,9,246),
+  c(16,7,5),c(0,8,87),c(0,8,23),c(64,8,0),c(19,7,51),c(0,8,119),c(0,8,55),
+  c(0,9,206),c(17,7,15),c(0,8,103),c(0,8,39),c(0,9,174),c(0,8,7),c(0,8,135),
+  c(0,8,71),c(0,9,238),c(16,7,9),c(0,8,95),c(0,8,31),c(0,9,158),c(20,7,99),
+  c(0,8,127),c(0,8,63),c(0,9,222),c(18,7,27),c(0,8,111),c(0,8,47),c(0,9,190),
+  c(0,8,15),c(0,8,143),c(0,8,79),c(0,9,254),c(96,7,0),c(0,8,80),c(0,8,16),
+  c(20,8,115),c(18,7,31),c(0,8,112),c(0,8,48),c(0,9,193),c(16,7,10),c(0,8,96),
+  c(0,8,32),c(0,9,161),c(0,8,0),c(0,8,128),c(0,8,64),c(0,9,225),c(16,7,6),
+  c(0,8,88),c(0,8,24),c(0,9,145),c(19,7,59),c(0,8,120),c(0,8,56),c(0,9,209),
+  c(17,7,17),c(0,8,104),c(0,8,40),c(0,9,177),c(0,8,8),c(0,8,136),c(0,8,72),
+  c(0,9,241),c(16,7,4),c(0,8,84),c(0,8,20),c(21,8,227),c(19,7,43),c(0,8,116),
+  c(0,8,52),c(0,9,201),c(17,7,13),c(0,8,100),c(0,8,36),c(0,9,169),c(0,8,4),
+  c(0,8,132),c(0,8,68),c(0,9,233),c(16,7,8),c(0,8,92),c(0,8,28),c(0,9,153),
+  c(20,7,83),c(0,8,124),c(0,8,60),c(0,9,217),c(18,7,23),c(0,8,108),c(0,8,44),
+  c(0,9,185),c(0,8,12),c(0,8,140),c(0,8,76),c(0,9,249),c(16,7,3),c(0,8,82),
+  c(0,8,18),c(21,8,163),c(19,7,35),c(0,8,114),c(0,8,50),c(0,9,197),c(17,7,11),
+  c(0,8,98),c(0,8,34),c(0,9,165),c(0,8,2),c(0,8,130),c(0,8,66),c(0,9,229),
+  c(16,7,7),c(0,8,90),c(0,8,26),c(0,9,149),c(20,7,67),c(0,8,122),c(0,8,58),
+  c(0,9,213),c(18,7,19),c(0,8,106),c(0,8,42),c(0,9,181),c(0,8,10),c(0,8,138),
+  c(0,8,74),c(0,9,245),c(16,7,5),c(0,8,86),c(0,8,22),c(64,8,0),c(19,7,51),
+  c(0,8,118),c(0,8,54),c(0,9,205),c(17,7,15),c(0,8,102),c(0,8,38),c(0,9,173),
+  c(0,8,6),c(0,8,134),c(0,8,70),c(0,9,237),c(16,7,9),c(0,8,94),c(0,8,30),
+  c(0,9,157),c(20,7,99),c(0,8,126),c(0,8,62),c(0,9,221),c(18,7,27),c(0,8,110),
+  c(0,8,46),c(0,9,189),c(0,8,14),c(0,8,142),c(0,8,78),c(0,9,253),c(96,7,0),
+  c(0,8,81),c(0,8,17),c(21,8,131),c(18,7,31),c(0,8,113),c(0,8,49),c(0,9,195),
+  c(16,7,10),c(0,8,97),c(0,8,33),c(0,9,163),c(0,8,1),c(0,8,129),c(0,8,65),
+  c(0,9,227),c(16,7,6),c(0,8,89),c(0,8,25),c(0,9,147),c(19,7,59),c(0,8,121),
+  c(0,8,57),c(0,9,211),c(17,7,17),c(0,8,105),c(0,8,41),c(0,9,179),c(0,8,9),
+  c(0,8,137),c(0,8,73),c(0,9,243),c(16,7,4),c(0,8,85),c(0,8,21),c(16,8,258),
+  c(19,7,43),c(0,8,117),c(0,8,53),c(0,9,203),c(17,7,13),c(0,8,101),c(0,8,37),
+  c(0,9,171),c(0,8,5),c(0,8,133),c(0,8,69),c(0,9,235),c(16,7,8),c(0,8,93),
+  c(0,8,29),c(0,9,155),c(20,7,83),c(0,8,125),c(0,8,61),c(0,9,219),c(18,7,23),
+  c(0,8,109),c(0,8,45),c(0,9,187),c(0,8,13),c(0,8,141),c(0,8,77),c(0,9,251),
+  c(16,7,3),c(0,8,83),c(0,8,19),c(21,8,195),c(19,7,35),c(0,8,115),c(0,8,51),
+  c(0,9,199),c(17,7,11),c(0,8,99),c(0,8,35),c(0,9,167),c(0,8,3),c(0,8,131),
+  c(0,8,67),c(0,9,231),c(16,7,7),c(0,8,91),c(0,8,27),c(0,9,151),c(20,7,67),
+  c(0,8,123),c(0,8,59),c(0,9,215),c(18,7,19),c(0,8,107),c(0,8,43),c(0,9,183),
+  c(0,8,11),c(0,8,139),c(0,8,75),c(0,9,247),c(16,7,5),c(0,8,87),c(0,8,23),
+  c(64,8,0),c(19,7,51),c(0,8,119),c(0,8,55),c(0,9,207),c(17,7,15),c(0,8,103),
+  c(0,8,39),c(0,9,175),c(0,8,7),c(0,8,135),c(0,8,71),c(0,9,239),c(16,7,9),
+  c(0,8,95),c(0,8,31),c(0,9,159),c(20,7,99),c(0,8,127),c(0,8,63),c(0,9,223),
+  c(18,7,27),c(0,8,111),c(0,8,47),c(0,9,191),c(0,8,15),c(0,8,143),c(0,8,79),
+  c(0,9,255)
+  */
+  undefined
+};
+
+const distfix = []code{
+  /*
+  c(16,5,1),c(23,5,257),c(19,5,17),c(27,5,4097),c(17,5,5),c(25,5,1025),
+  c(21,5,65),c(29,5,16385),c(16,5,3),c(24,5,513),c(20,5,33),c(28,5,8193),
+  c(18,5,9),c(26,5,2049),c(22,5,129),c(64,5,0),c(16,5,2),c(23,5,385),
+  c(19,5,25),c(27,5,6145),c(17,5,7),c(25,5,1537),c(21,5,97),c(29,5,24577),
+  c(16,5,4),c(24,5,769),c(20,5,49),c(28,5,12289),c(18,5,13),c(26,5,3073),
+  c(22,5,193),c(64,5,0)
+  */
+  undefined
+};
+
+fn fixedtables(state: &InflateState) {
+  state.lencode = &lenfix[0];
+  state.lenbits = 9;
+  state.distcode = &distfix[0];
+  state.distbits = 5;
 }
 
 #attribute("test")
@@ -866,7 +999,6 @@ fn test_inflate() {
   inflateInit(&strm);
 
   var output_buf: [0x1000]u8 = undefined;
-
   const hello_str = "hello";
   const hello_compressed = []u8 {
     120, 156, 203, 72, 205, 201, 201, 7, 0, 6, 44, 2, 21,
@@ -874,11 +1006,18 @@ fn test_inflate() {
   strm.input_buf = hello_compressed;
   strm.output_buf = output_buf;
 
-  inflate(&strm) %% |err| {
+  inflate(&strm, FlushMode.Z_FINISH) %% |err| {
     %%io.stdout.printf("got error: ");
     %%io.stdout.printf(@err_name(err));
     %%io.stdout.printf("\n");
   };
+
+  // TODO: shouldn't have to cast to isize
+  if (str_eql(hello_str, output_buf[0...isize(strm.total_out)])) {
+    %%io.stdout.printf("correct output\n");
+  } else {
+    %%io.stdout.printf("wrong output\n");
+  }
 
   %%io.stdout.print_u64(@sizeof(z_stream));
   %%io.stdout.printf("\n");
