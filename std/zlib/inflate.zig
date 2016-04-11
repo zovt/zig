@@ -71,7 +71,7 @@ pub struct InflateState {
     hold: u32,              /* input bit accumulator */
     bits: u32,              /* number of bits in "in" */
         /* for string and stored block copying */
-    length: u32,            /* literal or length of data to copy */
+    length: isize,          /* literal or length of data to copy */
     offset: u32,            /* distance back to copy string from */
         /* for table and code decoding */
     extra: u32,             /* extra bits needed */
@@ -118,8 +118,6 @@ pub struct z_stream {
     output_buf: []u8,
     total_out: u32,      /* total number of bytes output so far */
 
-    msg: []u8,           /* last error message, NULL if no error */
-
     data_type: u32,      /* best guess about the data type: binary or text */
     adler: u32,          /* adler32 value of the uncompressed data */
 
@@ -142,7 +140,6 @@ pub fn inflateReset(strm: &z_stream) {
   strm.total_in = 0;
   strm.total_out = 0;
   state.total = 0;
-  strm.msg = "";
   if (state.wrap != 0) {
     /* to support ill-conceived Java test suite */
     strm.adler = state.wrap & 1;
@@ -164,6 +161,12 @@ pub fn inflateReset(strm: &z_stream) {
 error NullOutBuffer;
 error NullInBuffer;
 error CorruptState;
+error IncorrectHeaderCheck;
+error UnknownCompressionMethod;
+error InvalidWindowSize;
+error InvalidBlockType;
+error InvalidStoredBlockLengths;
+
 
 /* permutation of code lengths */
 const order = []u16{
@@ -217,7 +220,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
   var bits: u32 = undefined;       /* bits in bit buffer */
   var in: isize = undefined;       /* save starting available input and output */
   var out: isize = undefined;      /* save starting available input and output */
-  var copy: u32 = undefined;       /* number of stored or match bytes to copy */
+  var copy: isize = undefined;     /* number of stored or match bytes to copy */
   var from: &u8 = undefined;       /* where to copy match bytes from */
   var here: code = undefined;      /* current decoding table entry */
   var last: code = undefined;      /* parent table entry */
@@ -234,6 +237,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
 
   in = next.len;
   out = put.len;
+  //@breakpoint();
   while (true) {
     switch (state.mode) {
       HEAD => {
@@ -264,12 +268,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
         /* check if zlib header allowed */
         if (state.wrap & 1 == 0 ||
             ((BITS(hold, 8) << 8) + (hold >> 8)) % 31 != 0) {
-          strm.msg = "incorrect header check";
+          ret = error.IncorrectHeaderCheck;
           state.mode = inflate_mode.BAD;
           continue;
         }
         if (BITS(hold, 4) != Z_DEFLATED) {
-          strm.msg = "unknown compression method";
+          ret = error.UnknownCompressionMethod;
           state.mode = inflate_mode.BAD;
           continue;
         }
@@ -279,7 +283,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
         if (state.wbits == 0) {
           state.wbits = len;
         } else if (len > state.wbits) {
-          strm.msg = "invalid window size";
+          ret = error.InvalidWindowSize;
           state.mode = inflate_mode.BAD;
           continue;
         }
@@ -486,7 +490,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.TABLE;
           },
           3 => {
-            strm.msg = "invalid block type";
+            ret = error.InvalidBlockType;
             state.mode = inflate_mode.BAD;
           },
           else => unreachable{},
@@ -505,12 +509,13 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
           next = next[1...];
           bits += 8;
         }
-        if ((hold & 0xffff) != ((hold >> 16) ^ 0xffff)) {
-          strm.msg = "invalid stored block lengths";
+        // TODO: use ~
+        if (hold & 0xffff != (hold >> 16) ^ 0xffff) {
+          ret = error.InvalidStoredBlockLengths;
           state.mode = inflate_mode.BAD;
           continue;
         }
-        state.length = hold & 0xffff;
+        state.length = isize(hold & 0xffff);
         hold = 0;
         bits = 0;
         state.mode = inflate_mode.COPY_;
@@ -522,14 +527,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
       COPY => {
         copy = state.length;
         if (copy != 0) {
-          if (copy > have) copy = have;
-          if (copy > left) copy = left;
+          if (copy > next.len) copy = next.len;
+          if (copy > put.len) copy = put.len;
           if (copy == 0) goto inf_leave;
-          zmemcpy(put, next, copy);
-          have -= copy;
-          next += copy;
-          left -= copy;
-          put += copy;
+          @memcpy(&put[0], &next[0], copy);
+          next = next[copy...];
+          put = put[copy...];
           state.length -= copy;
           continue;
         }
@@ -845,15 +848,20 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
         case inflate_mode.DONE:
             ret = Z_STREAM_END;
             goto inf_leave;
-        case inflate_mode.BAD:
-            ret = Z_DATA_ERROR;
-            goto inf_leave;
+      */
+        BAD => {
+          goto inf_leave;
+        },
+      /*
         case inflate_mode.MEM:
             return Z_MEM_ERROR;
         case inflate_mode.SYNC:
         default:
       */
-      else => return error.CorruptState,
+      else => {
+        //@breakpoint();
+        return error.CorruptState;
+      },
     }
   }
 
@@ -1001,7 +1009,18 @@ fn test_inflate() {
   var output_buf: [0x1000]u8 = undefined;
   const hello_str = "hello";
   const hello_compressed = []u8 {
-    120, 156, 203, 72, 205, 201, 201, 7, 0, 6, 44, 2, 21,
+    // hello:
+    // 0x78, 0x9c, 0xcb, 0x48,
+    // 0xcd, 0xc9, 0xc9, 0x07,
+    // 0x00, 0x06, 0x2c, 0x02,
+    // 0x15,
+
+    // empty string:
+    // 0x78, 0x9c, 0x03, 0x00,
+    // 0x00, 0x00, 0x00, 0x01,
+
+    // raw empty string:
+    0x03, 0x00,
   };
   strm.input_buf = hello_compressed;
   strm.output_buf = output_buf;
