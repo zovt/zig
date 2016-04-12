@@ -72,9 +72,9 @@ pub struct InflateState {
     bits: u32,              /* number of bits in "in" */
         /* for string and stored block copying */
     length: isize,          /* literal or length of data to copy */
-    offset: u32,            /* distance back to copy string from */
+    offset: isize,          /* distance back to copy string from */
         /* for table and code decoding */
-    extra: u32,             /* extra bits needed */
+    extra: u8,              /* extra bits needed (value always in range [0,15]) */
         /* fixed and dynamic code tables */
     lencode: &const code,   /* starting table for length/literal codes */
     distcode: &const code,  /* starting table for distance codes */
@@ -91,7 +91,7 @@ pub struct InflateState {
     codes: [ENOUGH]code,    /* space for code tables */
     sane: bool,             /* if false, allow invalid distance too far */
     back: i32,              /* bits back of last unprocessed length/lit */
-    was: u32,               /* initial length of match */
+    was: isize,             /* initial length of match */
 }
 
 struct gz_header {
@@ -158,43 +158,30 @@ pub fn inflateReset(strm: &z_stream) {
   state.back = -1;
 }
 
-error NullOutBuffer;
-error NullInBuffer;
 error CorruptState;
 error IncorrectHeaderCheck;
 error UnknownCompressionMethod;
 error InvalidWindowSize;
 error InvalidBlockType;
 error InvalidStoredBlockLengths;
-
+error UnknownHeaderFlagsSet;
+error HeaderCrcMismatch;
+error TooManyLengthOrDistanceSymbols;
+error InvalidCodeLengthsSet;
+error InvalidBitLengthRepeat;
+error InvalidCode_MissingEndOfBlock;
+error InvalidLiteralLengthsSet;
+error InvalidDistancesSet;
+error InvalidLiteralLengthCode;
+error InvalidDistanceCode;
+error InvalidDistanceTooFarBack;
+error IncorrectDataCheck;
+error IncorrectLengthCheck;
 
 /* permutation of code lengths */
 const order = []u16{
   16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15,
 };
-
-/* #define PULLBYTE() \
-    do { \
-        if (have == 0) goto inf_leave; \
-        have--; \
-        hold += (unsigned long)(*next++) << bits; \
-        bits += 8; \
-    } while (0)
-*/
-/* #define NEEDBITS(n) \
-    do { \
-        while (bits < (unsigned)(n)) \
-            PULLBYTE(); \
-    } while (0)
-*/
-/*
-while (bits < n) {
-  if (next.len == 0) goto inf_leave;
-  hold += u32(next[0]) << bits;
-  next = next[1...];
-  bits += 8;
-}
-*/
 
 enum FlushMode {
   Z_NO_FLUSH,
@@ -215,7 +202,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
   var next: []u8 = undefined;      /* next input */
   var put: []u8 = undefined;       /* next output */
   // var have: u32 = undefined; now: next.len      /* available input and output */
-  //var left: u32 = undefined; now:put.len      /* available input and output */
+  // var left: u32 = undefined; now: put.len       /* available input and output */
   var hold: u32 = undefined;       /* bit buffer */
   var bits: u32 = undefined;       /* bits in bit buffer */
   var in: isize = undefined;       /* save starting available input and output */
@@ -237,7 +224,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
 
   in = next.len;
   out = put.len;
-  //@breakpoint();
+  @breakpoint();
   while (true) {
     switch (state.mode) {
       HEAD => {
@@ -296,15 +283,20 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
       },
       /*
         case inflate_mode.FLAGS:
-            NEEDBITS(16);
+            while (bits < 16) {
+              if (next.len == 0) goto inf_leave;
+              hold += u32(next[0]) << bits;
+              next = next[1...];
+              bits += 8;
+            }
             state.flags = (int)(hold);
             if ((state.flags & 0xff) != Z_DEFLATED) {
-                strm.msg = (char *)"unknown compression method";
+                ret = error.UnknownCompressionMethod;
                 state.mode = inflate_mode.BAD;
                 continue;
             }
             if (state.flags & 0xe000) {
-                strm.msg = (char *)"unknown header flags set";
+                ret = error.UnknownHeaderFlagsSet;
                 state.mode = inflate_mode.BAD;
                 continue;
             }
@@ -319,7 +311,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             bits = 0;
             state.mode = inflate_mode.TIME;
         case inflate_mode.TIME:
-            NEEDBITS(32);
+            while (bits < 32) {
+              if (next.len == 0) goto inf_leave;
+              hold += u32(next[0]) << bits;
+              next = next[1...];
+              bits += 8;
+            }
             if (state.head != Z_NULL)
                 state.head.time = hold;
             if (state.flags & 0x0200) CRC4(state.check, hold);
@@ -327,7 +324,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             bits = 0;
             state.mode = inflate_mode.OS;
         case inflate_mode.OS:
-            NEEDBITS(16);
+            while (bits < 16) {
+              if (next.len == 0) goto inf_leave;
+              hold += u32(next[0]) << bits;
+              next = next[1...];
+              bits += 8;
+            }
             if (state.head != Z_NULL) {
                 state.head.xflags = (int)(hold & 0xff);
                 state.head.os = (int)(hold >> 8);
@@ -342,7 +344,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.EXLEN;
         case inflate_mode.EXLEN:
             if (state.flags & 0x0400) {
-                NEEDBITS(16);
+                while (bits < 16) {
+                  if (next.len == 0) goto inf_leave;
+                  hold += u32(next[0]) << bits;
+                  next = next[1...];
+                  bits += 8;
+                }
                 state.length = (unsigned)(hold);
                 if (state.head != Z_NULL)
                     state.head.extra_len = (unsigned)hold;
@@ -360,7 +367,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
         case inflate_mode.EXTRA:
             if (state.flags & 0x0400) {
                 copy = state.length;
-                if (copy > have) copy = have;
+                if (copy > next.len) copy = next.len;
                 if (copy) {
                     if (state.head != Z_NULL &&
                         state.head.extra != Z_NULL) {
@@ -371,7 +378,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
                     }
                     if (state.flags & 0x0200)
                         state.check = crc32(state.check, next, copy);
-                    have -= copy;
+                    next.len -= copy;
                     next += copy;
                     state.length -= copy;
                 }
@@ -381,7 +388,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.NAME;
         case inflate_mode.NAME:
             if (state.flags & 0x0800) {
-                if (have == 0) goto inf_leave;
+                if (next.len == 0) goto inf_leave;
                 copy = 0;
                 do {
                     len = (unsigned)(next[copy++]);
@@ -389,10 +396,10 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
                             state.head.name != Z_NULL &&
                             state.length < state.head.name_max)
                         state.head.name[state.length++] = len;
-                } while (len && copy < have);
+                } while (len && copy < next.len);
                 if (state.flags & 0x0200)
                     state.check = crc32(state.check, next, copy);
-                have -= copy;
+                next.len -= copy;
                 next += copy;
                 if (len) goto inf_leave;
             }
@@ -402,7 +409,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.COMMENT;
         case inflate_mode.COMMENT:
             if (state.flags & 0x1000) {
-                if (have == 0) goto inf_leave;
+                if (next.len == 0) goto inf_leave;
                 copy = 0;
                 do {
                     len = (unsigned)(next[copy++]);
@@ -410,10 +417,10 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
                             state.head.comment != Z_NULL &&
                             state.length < state.head.comm_max)
                         state.head.comment[state.length++] = len;
-                } while (len && copy < have);
+                } while (len && copy < next.len);
                 if (state.flags & 0x0200)
                     state.check = crc32(state.check, next, copy);
-                have -= copy;
+                next.len -= copy;
                 next += copy;
                 if (len) goto inf_leave;
             }
@@ -422,9 +429,14 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.HCRC;
         case inflate_mode.HCRC:
             if (state.flags & 0x0200) {
-                NEEDBITS(16);
+                while (bits < 16) {
+                  if (next.len == 0) goto inf_leave;
+                  hold += u32(next[0]) << bits;
+                  next = next[1...];
+                  bits += 8;
+                }
                 if (hold != (state.check & 0xffff)) {
-                    strm.msg = (char *)"header crc mismatch";
+                    ret = error.HeaderCrcMismatch;
                     state.mode = inflate_mode.BAD;
                     continue;
                 }
@@ -439,14 +451,22 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.TYPE;
             continue;
         case inflate_mode.DICTID:
-            NEEDBITS(32);
+            while (bits < 32) {
+              if (next.len == 0) goto inf_leave;
+              hold += u32(next[0]) << bits;
+              next = next[1...];
+              bits += 8;
+            }
             strm.adler = state.check = ZSWAP32(hold);
             hold = 0;
             bits = 0;
             state.mode = inflate_mode.DICT;
         case inflate_mode.DICT:
             if (state.havedict == 0) {
-                RESTORE();
+                strm.output_buf = put;
+                strm.input_buf = next;
+                state.hold = hold;
+                state.bits = bits;
                 return Z_NEED_DICT;
             }
             strm.adler = state.check = adler32(0L, Z_NULL, 0);
@@ -541,7 +561,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
       },
       /*
         case inflate_mode.TABLE:
-            NEEDBITS(14);
+            while (bits < 14) {
+              if (next.len == 0) goto inf_leave;
+              hold += u32(next[0]) << bits;
+              next = next[1...];
+              bits += 8;
+            }
             state.nlen = BITS(hold, 5) + 257;
             hold >>= 5;
             bits -= 5;
@@ -552,7 +577,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             hold >>= 4;
             bits -= 4;
             if (state.nlen > 286 || state.ndist > 30) {
-                strm.msg = (char *)"too many length or distance symbols";
+                ret = error.TooManyLengthOrDistanceSymbols;
                 state.mode = BAD;
                 break;
             }
@@ -560,7 +585,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.LENLENS;
         case inflate_mode.LENLENS:
             while (state.have < state.ncode) {
-                NEEDBITS(3);
+                while (bits < 3) {
+                  if (next.len == 0) goto inf_leave;
+                  hold += u32(next[0]) << bits;
+                  next = next[1...];
+                  bits += 8;
+                }
                 state.lens[order[state.have++]] = (unsigned short)BITS(hold, 3);
                 hold >>= 3;
                 bits -= 3;
@@ -573,7 +603,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             ret = inflate_table(CODES, state.lens, 19, &(state.next),
                                 &(state.lenbits), state.work);
             if (ret) {
-                strm.msg = (char *)"invalid code lengths set";
+                ret = error.InvalidCodeLengthsSet;
                 state.mode = inflate_mode.BAD;
                 continue;
             }
@@ -581,10 +611,13 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.CODELENS;
         case inflate_mode.CODELENS:
             while (state.have < state.nlen + state.ndist) {
-                for (;;) {
+                while (true) {
                     here = state.lencode[BITS(hold, state.lenbits)];
                     if ((unsigned)(here.bits) <= bits) break;
-                    PULLBYTE();
+                    if (next.len == 0) goto inf_leave;
+                    hold += u32(next[0]) << bits;
+                    next = next[1...];
+                    bits += 8;
                 }
                 if (here.val < 16) {
                     hold >>= here.bits;
@@ -593,11 +626,16 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
                 }
                 else {
                     if (here.val == 16) {
-                        NEEDBITS(here.bits + 2);
+                        while (bits < here.bits + 2) {
+                          if (next.len == 0) goto inf_leave;
+                          hold += u32(next[0]) << bits;
+                          next = next[1...];
+                          bits += 8;
+                        }
                         hold >>= here.bits;
                         bits -= here.bits;
                         if (state.have == 0) {
-                            strm.msg = (char *)"invalid bit length repeat";
+                            ret = error.InvalidBitLengthRepeat;
                             state.mode = inflate_mode.BAD;
                             continue;
                         }
@@ -607,7 +645,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
                         bits -= 2;
                     }
                     else if (here.val == 17) {
-                        NEEDBITS(here.bits + 3);
+                        while (bits < here.bits + 3) {
+                          if (next.len == 0) goto inf_leave;
+                          hold += u32(next[0]) << bits;
+                          next = next[1...];
+                          bits += 8;
+                        }
                         hold >>= here.bits;
                         bits -= here.bits;
                         len = 0;
@@ -616,7 +659,12 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
                         bits -= 3;
                     }
                     else {
-                        NEEDBITS(here.bits + 7);
+                        while (bits < here.bits + 7) {
+                          if (next.len == 0) goto inf_leave;
+                          hold += u32(next[0]) << bits;
+                          next = next[1...];
+                          bits += 8;
+                        }
                         hold >>= here.bits;
                         bits -= here.bits;
                         len = 0;
@@ -625,7 +673,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
                         bits -= 7;
                     }
                     if (state.have + copy > state.nlen + state.ndist) {
-                        strm.msg = (char *)"invalid bit length repeat";
+                        ret = error.InvalidBitLengthRepeat;
                         state.mode = inflate_mode.BAD;
                         continue;
                     }
@@ -639,7 +687,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
 
             /* check for end-of-block code (better have one) */
             if (state.lens[256] == 0) {
-                strm.msg = (char *)"invalid code -- missing end-of-block";
+                ret = error.InvalidCode_MissingEndOfBlock;
                 state.mode = inflate_mode.BAD;
                 continue;
             }
@@ -653,7 +701,7 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             ret = inflate_table(LENS, state.lens, state.nlen, &(state.next),
                                 &(state.lenbits), state.work);
             if (ret) {
-                strm.msg = (char *)"invalid literal/lengths set";
+                ret = error.InvalidLiteralLengthsSet;
                 state.mode = inflate_mode.BAD;
                 continue;
             }
@@ -662,41 +710,55 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             ret = inflate_table(DISTS, state.lens + state.nlen, state.ndist,
                             &(state.next), &(state.distbits), state.work);
             if (ret) {
-                strm.msg = (char *)"invalid distances set";
+                ret = error.InvalidDistancesSet;
                 state.mode = inflate_mode.BAD;
                 continue;
             }
             state.mode = inflate_mode.LEN_;
             if (flush == FlushMode.Z_TREES) goto inf_leave;
-        case inflate_mode.LEN_:
-            state.mode = inflate_mode.LEN;
-        case inflate_mode.LEN:
-            if (have >= 6 && left >= 258) {
-                RESTORE();
+        */
+        LEN_ => {
+          state.mode = inflate_mode.LEN;
+        },
+        LEN => {
+            if (next.len >= 6 && put.len >= 258) {
+                strm.output_buf = put;
+                strm.input_buf = next;
+                state.hold = hold;
+                state.bits = bits;
+
                 inflate_fast(strm, out);
-                put = strm.next_out;
-                left = strm.avail_out;
-                next = strm.next_in;
-                have = strm.avail_in;
+
+                put = strm.output_buf;
+                next = strm.input_buf;
                 hold = state.hold;
                 bits = state.bits;
+
                 if (state.mode == inflate_mode.TYPE)
                     state.back = -1;
                 continue;
             }
             state.back = 0;
-            for (;;) {
-                here = state.lencode[BITS(hold, state.lenbits)];
-                if ((unsigned)(here.bits) <= bits) break;
-                PULLBYTE();
+            while (true) {
+                // TODO: shouldn't have to cast to isize
+                here = state.lencode[isize(BITS(hold, state.lenbits))];
+                if (here.bits <= bits) break;
+                if (next.len == 0) goto inf_leave;
+                hold += u32(next[0]) << bits;
+                next = next[1...];
+                bits += 8;
             }
-            if (here.op && (here.op & 0xf0) == 0) {
+            if (here.op != 0 && (here.op & 0xf0) == 0) {
                 last = here;
-                for (;;) {
-                    here = state.lencode[last.val +
-                            (BITS(hold, last.bits + last.op) >> last.bits)];
-                    if ((unsigned)(last.bits + here.bits) <= bits) break;
-                    PULLBYTE();
+                while (true) {
+                    // TODO: shouldn't have to cast to isize
+                    here = state.lencode[isize(last.val +
+                            (BITS(hold, last.bits + last.op) >> last.bits))];
+                    if (last.bits + here.bits <= bits) break;
+                    if (next.len == 0) goto inf_leave;
+                    hold += u32(next[0]) << bits;
+                    next = next[1...];
+                    bits += 8;
                 }
                 hold >>= last.bits;
                 bits -= last.bits;
@@ -705,51 +767,61 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             hold >>= here.bits;
             bits -= here.bits;
             state.back += here.bits;
-            state.length = (unsigned)here.val;
-            if ((int)(here.op) == 0) {
-                Tracevv((stderr, here.val >= 0x20 && here.val < 0x7f ?
-                        "inflate:         literal '%c'\n" :
-                        "inflate:         literal 0x%02x\n", here.val));
+            state.length = here.val;
+            if (here.op == 0) {
                 state.mode = inflate_mode.LIT;
                 continue;
             }
-            if (here.op & 32) {
-                Tracevv((stderr, "inflate:         end of block\n"));
+            if (here.op & 32 != 0) {
                 state.back = -1;
                 state.mode = inflate_mode.TYPE;
                 continue;
             }
-            if (here.op & 64) {
-                strm.msg = (char *)"invalid literal/length code";
+            if (here.op & 64 != 0) {
+                ret = error.InvalidLiteralLengthCode;
                 state.mode = inflate_mode.BAD;
                 continue;
             }
-            state.extra = (unsigned)(here.op) & 15;
+            state.extra = here.op & 15;
             state.mode = inflate_mode.LENEXT;
-        case inflate_mode.LENEXT:
-            if (state.extra) {
-                NEEDBITS(state.extra);
-                state.length += BITS(hold, state.extra);
+        },
+        LENEXT => {
+            if (state.extra != 0) {
+                while (bits < state.extra) {
+                  if (next.len == 0) goto inf_leave;
+                  hold += u32(next[0]) << bits;
+                  next = next[1...];
+                  bits += 8;
+                }
+                state.length += u16(BITS(hold, state.extra));
                 hold >>= state.extra;
                 bits -= state.extra;
-                state.back += state.extra;
+                state.back += i32(state.extra);
             }
-            Tracevv((stderr, "inflate:         length %u\n", state.length));
             state.was = state.length;
             state.mode = inflate_mode.DIST;
-        case inflate_mode.DIST:
-            for (;;) {
-                here = state.distcode[BITS(hold, state.distbits)];
-                if ((unsigned)(here.bits) <= bits) break;
-                PULLBYTE();
+        },
+        DIST => {
+            while (true) {
+                // TODO: shouldn't have to cast to isize
+                here = state.distcode[isize(BITS(hold, state.distbits))];
+                if (here.bits <= bits) break;
+                if (next.len == 0) goto inf_leave;
+                hold += u32(next[0]) << bits;
+                next = next[1...];
+                bits += 8;
             }
             if ((here.op & 0xf0) == 0) {
                 last = here;
-                for (;;) {
-                    here = state.distcode[last.val +
-                            (BITS(hold, last.bits + last.op) >> last.bits)];
-                    if ((unsigned)(last.bits + here.bits) <= bits) break;
-                    PULLBYTE();
+                while (true) {
+                    // TODO: shouldn't have to cast to isize
+                    here = state.distcode[isize(last.val +
+                            (BITS(hold, last.bits + last.op) >> last.bits))];
+                    if (last.bits + here.bits <= bits) break;
+                    if (next.len == 0) goto inf_leave;
+                    hold += u32(next[0]) << bits;
+                    next = next[1...];
+                    bits += 8;
                 }
                 hold >>= last.bits;
                 bits -= last.bits;
@@ -758,32 +830,38 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             hold >>= here.bits;
             bits -= here.bits;
             state.back += here.bits;
-            if (here.op & 64) {
-                strm.msg = (char *)"invalid distance code";
+            if ((here.op & 64) != 0) {
+                ret = error.InvalidDistanceCode;
                 state.mode = inflate_mode.BAD;
                 continue;
             }
-            state.offset = (unsigned)here.val;
-            state.extra = (unsigned)(here.op) & 15;
+            state.offset = here.val;
+            state.extra = here.op & 15;
             state.mode = inflate_mode.DISTEXT;
-        case inflate_mode.DISTEXT:
-            if (state.extra) {
-                NEEDBITS(state.extra);
-                state.offset += BITS(hold, state.extra);
+        },
+        DISTEXT => {
+            if (state.extra != 0) {
+                while (bits < state.extra) {
+                  if (next.len == 0) goto inf_leave;
+                  hold += u32(next[0]) << bits;
+                  next = next[1...];
+                  bits += 8;
+                }
+                state.offset += u16(BITS(hold, state.extra));
                 hold >>= state.extra;
                 bits -= state.extra;
                 state.back += state.extra;
             }
-            Tracevv((stderr, "inflate:         distance %u\n", state.offset));
             state.mode = inflate_mode.MATCH;
-        case inflate_mode.MATCH:
-            if (left == 0) goto inf_leave;
-            copy = out - left;
+        },
+        MATCH => {
+            if (put.len == 0) goto inf_leave;
+            copy = out - put.len;
             if (state.offset > copy) {         /* copy from window */
                 copy = state.offset - copy;
                 if (copy > state.whave) {
                     if (state.sane) {
-                        strm.msg = (char *)"invalid distance too far back";
+                        ret = error.InvalidDistanceTooFarBack;
                         state.mode = inflate_mode.BAD;
                         continue;
                     }
@@ -800,32 +878,37 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
                 from = put - state.offset;
                 copy = state.length;
             }
-            if (copy > left) copy = left;
-            left -= copy;
+            if (copy > put.len) copy = put.len;
+            put.len -= copy;
             state.length -= copy;
-            do {
-                *put++ = *from++;
-            } while (--copy);
+            @memcpy(&put[0], &from[0], copy);
             if (state.length == 0) state.mode = inflate_mode.LEN;
             continue;
+        },
+        /*
         case inflate_mode.LIT:
-            if (left == 0) goto inf_leave;
+            if (put.len == 0) goto inf_leave;
             *put++ = (unsigned char)(state.length);
-            left--;
+            put.len--;
             state.mode = inflate_mode.LEN;
             continue;
         case inflate_mode.CHECK:
             if (state.wrap) {
-                NEEDBITS(32);
-                out -= left;
+                while (bits < 32) {
+                  if (next.len == 0) goto inf_leave;
+                  hold += u32(next[0]) << bits;
+                  next = next[1...];
+                  bits += 8;
+                }
+                out -= put.len;
                 strm.total_out += out;
                 state.total += out;
                 if (out)
                     strm.adler = state.check =
                         UPDATE(state.check, put - out, out);
-                out = left;
+                out = put.len;
                 if ((state.flags ? hold : ZSWAP32(hold)) != state.check) {
-                    strm.msg = (char *)"incorrect data check";
+                    ret = error.IncorrectDataCheck;
                     state.mode = inflate_mode.BAD;
                     continue;
                 }
@@ -835,9 +918,14 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
             state.mode = inflate_mode.LENGTH;
         case inflate_mode.LENGTH:
             if (state.wrap && state.flags) {
-                NEEDBITS(32);
+                while (bits < 32) {
+                  if (next.len == 0) goto inf_leave;
+                  hold += u32(next[0]) << bits;
+                  next = next[1...];
+                  bits += 8;
+                }
                 if (hold != (state.total & 0xffffffffUL)) {
-                    strm.msg = (char *)"incorrect length check";
+                    ret = error.IncorrectLengthCheck;
                     state.mode = inflate_mode.BAD;
                     continue;
                 }
@@ -865,37 +953,44 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
     }
   }
 
-    /*
-       Return from inflate(), updating the total counts and the check value.
-       If there was no progress during the inflate() call, return a buffer
-       error.  Call updatewindow() to create and/or update the window state.
-       Note: a memory error from inflate() is non-recoverable.
-     */
-  inf_leave:
   /*
-    RESTORE();
-    if (state.wsize || (out != strm.avail_out && state.mode < BAD &&
-            (state.mode < CHECK || flush != FlushMode.Z_FINISH)))
-        if (updatewindow(strm, strm.next_out, out - strm.avail_out)) {
-            state.mode = inflate_mode.MEM;
-            return Z_MEM_ERROR;
-        }
-    in -= strm.avail_in;
-    out -= strm.avail_out;
-    strm.total_in += in;
-    strm.total_out += out;
-    state.total += out;
-    if (state.wrap && out)
-        strm.adler = state.check =
-            UPDATE(state.check, strm.next_out - out, out);
-    strm.data_type = state.bits + (state.last ? 64 : 0) +
-                      (state.mode == inflate_mode.TYPE ? 128 : 0) +
-                      (state.mode == inflate_mode.LEN_ || state.mode == inflate_mode.COPY_ ? 256 : 0);
-    if (((in == 0 && out == 0) || flush == FlushMode.Z_FINISH) && ret == Z_OK)
-        ret = Z_BUF_ERROR;
-  */
+     Return from inflate(), updating the total counts and the check value.
+     If there was no progress during the inflate() call, return a buffer
+     error.  Call updatewindow() to create and/or update the window state.
+     Note: a memory error from inflate() is non-recoverable.
+   */
+  inf_leave:
+
+  RESTORE();
+  if (state.wsize || (out != strm.avail_out && state.mode < BAD &&
+          (state.mode < CHECK || flush != FlushMode.Z_FINISH)))
+      if (updatewindow(strm, strm.next_out, out - strm.avail_out)) {
+          state.mode = inflate_mode.MEM;
+          return Z_MEM_ERROR;
+      }
+  in -= strm.avail_in;
+  out -= strm.avail_out;
+  strm.total_in += in;
+  strm.total_out += out;
+  state.total += out;
+  if (state.wrap && out) {
+      state.check = UPDATE(state.check, strm.next_out - out, out);
+      strm.adler = state.check;
+  }
+  strm.data_type = state.bits + (if (state.last) 64 else 0) +
+                    (if (state.mode == inflate_mode.TYPE) 128 else 0) +
+                    (if (state.mode == inflate_mode.LEN_ || state.mode == inflate_mode.COPY_) 256 else 0);
+  if (((in == 0 && out == 0) || flush == FlushMode.Z_FINISH) && ret == Z_OK)
+      ret = Z_BUF_ERROR;
   return ret;
 }
+
+fn inflate_fast(strm: &z_stream, start: isize)
+{
+  // TODO
+  unreachable{};
+}
+
 
 fn c(op: u8, bits: u8, val: u16) -> code {
   return code{.op=op, .bits=bits, .val=val};
