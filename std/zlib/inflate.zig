@@ -64,8 +64,8 @@ pub struct InflateState {
         /* sliding window */
     wbits: u32,             /* log base 2 of requested window size */
     wsize: u32,             /* window size or zero if not using window */
-    whave: u32,             /* valid bytes in the window */
-    wnext: u32,             /* window write index */
+    whave: isize,           /* valid bytes in the window */
+    wnext: isize,           /* window write index */
     window: [WINDOW_SIZE]u8,/* sliding window, if needed */
         /* bit accumulator */
     hold: u32,              /* input bit accumulator */
@@ -977,9 +977,11 @@ pub fn inflate(strm: &z_stream, flush: FlushMode) -> %void {
       state.check = UPDATE(state.check, strm.next_out - out, out);
       strm.adler = state.check;
   }
-  strm.data_type = state.bits + (if (state.last) 64 else 0) +
-                    (if (state.mode == inflate_mode.TYPE) 128 else 0) +
-                    (if (state.mode == inflate_mode.LEN_ || state.mode == inflate_mode.COPY_) 256 else 0);
+  // TODO: https://github.com/andrewrk/zig/issues/136
+  // strm.data_type = state.bits +
+  //   (if (state.last) 64 else 0) +
+  //   (if (state.mode == inflate_mode.TYPE) 128 else 0) +
+  //   (if (state.mode == inflate_mode.LEN_ || state.mode == inflate_mode.COPY_) 256 else 0);
   if (((in == 0 && out == 0) || flush == FlushMode.Z_FINISH) && ret == Z_OK)
       ret = Z_BUF_ERROR;
   return ret;
