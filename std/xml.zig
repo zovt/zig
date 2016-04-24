@@ -10,7 +10,8 @@ pub enum TokenType {
 }
 pub struct XmlToken {
     token_type: TokenType,
-    src: []const u8,
+    start: isize,
+    end: isize,
 }
 
 enum Mode {
@@ -85,7 +86,8 @@ pub struct XmlTokenizer {
                             tokenizer.mode = Mode.InsideStartTag;
                             output_tokens[output_count] = XmlToken{
                                 .token_type = TokenType.StartTagStart,
-                                .src = tokenizer.src_buf[tag_start...tokenizer.cursor],
+                                .start = tag_start,
+                                .end = tokenizer.cursor,
                             };
                             output_count += 1;
                             if (output_count >= output_tokens.len) return output_count;
@@ -106,7 +108,8 @@ pub struct XmlTokenizer {
                             tokenizer.mode = Mode.None;
                             output_tokens[output_count] = XmlToken{
                                 .token_type = TokenType.StartTagEnd,
-                                .src = tokenizer.src_buf[tokenizer.cursor...tokenizer.cursor + 1],
+                                .start = tokenizer.cursor,
+                                .end = tokenizer.cursor + 1,
                             };
                             output_count += 1;
                             tokenizer.cursor += 1;
@@ -127,7 +130,8 @@ pub struct XmlTokenizer {
                         tokenizer.mode = Mode.None;
                         output_tokens[output_count] = XmlToken{
                             .token_type = TokenType.TagSelfClose,
-                            .src = tokenizer.src_buf[tokenizer.cursor - 1...tokenizer.cursor + 1],
+                            .start = tokenizer.cursor - 1,
+                            .end = tokenizer.cursor + 1,
                         };
                         output_count += 1;
                         tokenizer.cursor += 1;
@@ -137,7 +141,8 @@ pub struct XmlTokenizer {
                         tokenizer.mode = Mode.InsideStartTag;
                         output_tokens[output_count] = XmlToken{
                             .token_type = TokenType.Invalid,
-                            .src = tokenizer.src_buf[tokenizer.cursor...tokenizer.cursor + 1],
+                            .start = tokenizer.cursor,
+                            .end = tokenizer.cursor + 1,
                         };
                         output_count += 1;
                         if (output_count >= output_tokens.len) return output_count;
@@ -150,7 +155,8 @@ pub struct XmlTokenizer {
                             tokenizer.mode = Mode.InsideEndTag;
                             output_tokens[output_count] = XmlToken{
                                 .token_type = TokenType.EndTagStart,
-                                .src = tokenizer.src_buf[tag_start...tokenizer.cursor],
+                                .start = tag_start,
+                                .end = tokenizer.cursor,
                             };
                             output_count += 1;
                             if (output_count >= output_tokens.len) return output_count;
@@ -168,7 +174,8 @@ pub struct XmlTokenizer {
                             tokenizer.mode = Mode.None;
                             output_tokens[output_count] = XmlToken{
                                 .token_type = TokenType.EndTagEnd,
-                                .src = tokenizer.src_buf[tokenizer.cursor...tokenizer.cursor + 1],
+                                .start = tokenizer.cursor,
+                                .end = tokenizer.cursor + 1,
                             };
                             output_count += 1;
                             tokenizer.cursor += 1;
@@ -182,7 +189,8 @@ pub struct XmlTokenizer {
                             // invalid characters between "</name" and ">"
                             output_tokens[output_count] = XmlToken{
                                 .token_type = TokenType.Invalid,
-                                .src = tokenizer.src_buf[tokenizer.cursor...tokenizer.cursor + 1],
+                                .start = tokenizer.cursor,
+                                .end = tokenizer.cursor + 1,
                             };
                             output_count += 1;
                             tokenizer.cursor += 1;
@@ -200,29 +208,29 @@ pub struct XmlTokenizer {
 fn xml_test() {
     const simple_source = "<a><b/></a>";
     const simple_tokens = []?XmlToken{
-        XmlToken{
+        XmlToken{ // "<a"
             .token_type = TokenType.StartTagStart,
-            .src = simple_source[0...2], // "<a"
+            .start = 0, .end = 2,
         },
-        XmlToken{
+        XmlToken{ // ">"
             .token_type = TokenType.StartTagEnd,
-            .src = simple_source[2...3], // ">"
+            .start = 2, .end = 3,
         },
-        XmlToken{
+        XmlToken{ // "<b"
             .token_type = TokenType.StartTagStart,
-            .src = simple_source[3...5], // "<b"
+            .start = 3, .end = 5,
         },
-        XmlToken{
+        XmlToken{ // "/>"
             .token_type = TokenType.TagSelfClose,
-            .src = simple_source[5...7], // "/>"
+            .start = 5, .end = 7,
         },
-        XmlToken{
+        XmlToken{ // "</a"
             .token_type = TokenType.EndTagStart,
-            .src = simple_source[7...10], // "</a"
+            .start = 7, .end = 10,
         },
-        XmlToken{
+        XmlToken{ // ">"
             .token_type = TokenType.EndTagEnd,
-            .src = simple_source[10...11], // ">"
+            .start = 10, .end = 11,
         },
     };
     test_all_at_once(simple_source, simple_tokens);
@@ -266,7 +274,7 @@ fn test_all_at_once(source: []const u8, expected_tokens: []?XmlToken) {
 }
 fn token_equals(a: XmlToken, b: XmlToken) -> bool {
     a.token_type == b.token_type &&
-    // a.src.ptr    == b.src.ptr    &&
-    a.src.len    == b.src.len    &&
+    a.start      == b.start      &&
+    a.end        == b.end        &&
     true
 }
