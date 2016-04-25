@@ -2,6 +2,7 @@ const assert = @import("std").assert;
 
 pub enum TokenType {
     Invalid,
+    Text,            // "text outside tags"
     StartTagStart,   // "<name"
     StartTagEnd,     // ("<name") ">"
     TagSelfClose,    // ("<name") "/>"
@@ -19,6 +20,7 @@ pub struct XmlToken {
 
 enum Mode {
     None,
+    Text,           // "text outside tags"
     TagStart,       // "<"
     StartTagName,   // "<n", "<name"
     InsideStartTag, // "<name "
@@ -31,24 +33,22 @@ enum Mode {
 }
 pub struct XmlTokenizer {
     src_buf: []const u8,
+    is_eof: bool,
     cursor: isize,
     mode: Mode,
 
     pub fn init() -> XmlTokenizer {
         XmlTokenizer {
             .src_buf = []u8{},
+            .is_eof = false,
             .cursor = 0,
             .mode = Mode.None,
         }
     }
 
-    pub fn is_eof_acceptible(tokenizer: &XmlTokenizer) -> bool {
-        tokenizer.cursor == tokenizer.src_buf.len &&
-        tokenizer.mode == Mode.None
-    }
-
-    pub fn load(tokenizer: &XmlTokenizer, source_buffer: []const u8) {
+    pub fn load(tokenizer: &XmlTokenizer, source_buffer: []const u8, is_eof: bool) {
         tokenizer.src_buf = source_buffer;
+        tokenizer.is_eof = is_eof;
     }
     pub fn read_tokens(tokenizer: &XmlTokenizer, output_tokens: []XmlToken) -> isize {
         assert(output_tokens.len > 0);
@@ -65,10 +65,28 @@ pub struct XmlTokenizer {
                             tokenizer.cursor += 1;
                         },
                         else => {
-                            // TODO: text
-                            unreachable{};
-                            //tokenizer.mode = Mode.Text;
-                            //tokenizer.cursor += 1;
+                            tokenizer.mode = Mode.Text;
+                            token_start = tokenizer.cursor;
+                            tokenizer.cursor += 1;
+                        },
+                    }
+                },
+                Text => {
+                    switch (c) {
+                        '<' => {
+                            // done
+                            tokenizer.mode = Mode.None;
+                            output_tokens[output_count] = XmlToken{
+                                .token_type = TokenType.Text,
+                                .start = token_start,
+                                .end = tokenizer.cursor,
+                            };
+                            output_count += 1;
+                            if (output_count >= output_tokens.len) return output_count;
+                        },
+                        else => {
+                            // not done
+                            tokenizer.cursor += 1;
                         },
                     }
                 },
@@ -288,6 +306,25 @@ pub struct XmlTokenizer {
                 },
             }
         }
+
+        if (tokenizer.is_eof) {
+            if (tokenizer.mode == Mode.None) {
+                // all good
+            } else if (tokenizer.mode == Mode.Text) {
+                // flush the last text
+                tokenizer.mode = Mode.None;
+                output_tokens[output_count] = XmlToken{
+                    .token_type = TokenType.Text,
+                    .start = token_start,
+                    .end = tokenizer.cursor,
+                };
+                output_count += 1;
+                if (output_count >= output_tokens.len) return output_count;
+            } else {
+                // TODO: report early EOF
+                unreachable{};
+            }
+        }
         return output_count;
     }
 }
@@ -364,6 +401,41 @@ fn xml_attribute_test() {
     test_all_at_once(source, expected_tokens);
 }
 
+#attribute("test")
+fn xml_simple_text_test() {
+    const source = "text";
+    const expected_tokens = []?XmlToken{
+        XmlToken{
+            .token_type = TokenType.Text,
+            .start = 0, .end = 4,
+        },
+    };
+    test_all_at_once(source, expected_tokens);
+}
+#attribute("test")
+fn xml_tags_and_text_test() {
+    const source = "a <b/> c";
+    const expected_tokens = []?XmlToken{
+        XmlToken{ // "a "
+            .token_type = TokenType.Text,
+            .start = 0, .end = 2,
+        },
+        XmlToken{ // "<b"
+            .token_type = TokenType.StartTagStart,
+            .start = 2, .end = 4,
+        },
+        XmlToken{ // "/>"
+            .token_type = TokenType.TagSelfClose,
+            .start = 4, .end = 6,
+        },
+        XmlToken{ // " c"
+            .token_type = TokenType.Text,
+            .start = 6, .end = 8,
+        },
+    };
+    test_all_at_once(source, expected_tokens);
+}
+
 //TODO: #attribute("test")
 fn xml_complex_test() {
     const source = r"XML(
@@ -378,7 +450,9 @@ fn xml_complex_test() {
     </secondary>
   </group>
   <group name="Group 2" type="Crazy">
-    <a-:_2 x='"' y="'" frame="&amp;&lt;&gt;&apos;&quot;"/>
+    <a-:_2. quot='"' apos="'"
+        elements="&amp;&lt;&gt;&apos;&quot;"/>
+        characters="&#9;, &#x10FFFF;, &#1114111"
     <![CDATA[<literal text="in">a &quot;<![CDATA[>/literal>]]>
     <!--
       comment <contains> &apos; </stuff>
@@ -395,9 +469,8 @@ fn xml_complex_test() {
 fn test_all_at_once(source: []const u8, expected_tokens: []?XmlToken) {
     var tokens: [0x1000]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
-    tokenizer.load(source);
+    tokenizer.load(source, true);
     const read_count = tokenizer.read_tokens(tokens);
-    assert(tokenizer.is_eof_acceptible());
     assert(read_count == expected_tokens.len);
     for (expected_tokens) |maybe_expected_token, i| {
         if (const expected_token ?= maybe_expected_token) {
