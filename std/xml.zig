@@ -11,6 +11,7 @@ pub enum TokenType {
     AttributeName,   // ("<name ") "name"
     AttributeEquals, // ("<name ") "="
     AttributeValue,  // ("<name ") "'value'", '"value"'
+    Comment,         // "<!--text-->"
 }
 pub struct XmlToken {
     token_type: TokenType,
@@ -30,6 +31,11 @@ enum Mode {
     AttributeName,  // ("<name ") "a"
     AttributeValueDoubleQuote, // ("<name ") '"'
     AttributeValueSingleQuote, // ("<name ") "'"
+    SpecialTagStart,// "<!"
+    CommentStart_2, // "<!-"
+    InsideComment,  // "<!--"
+    CommentEnd_0,   // "<!-- -"
+    CommentEnd_1,   // "<!-- --"
 }
 pub struct XmlTokenizer {
     src_buf: []const u8,
@@ -97,7 +103,11 @@ pub struct XmlTokenizer {
                             tokenizer.mode = Mode.EndTagName;
                             tokenizer.cursor += 1;
                         },
-                        // TODO: '?', '!'
+                        '!' => {
+                            tokenizer.mode = Mode.SpecialTagStart;
+                            tokenizer.cursor += 1;
+                        },
+                        // TODO: '?'
                         else => {
                             tokenizer.mode = Mode.StartTagName;
                         },
@@ -304,6 +314,81 @@ pub struct XmlTokenizer {
                         },
                     }
                 },
+                SpecialTagStart => {
+                    // we have "<!"
+                    switch (c) {
+                        '-' => {
+                            tokenizer.mode = Mode.CommentStart_2;
+                            tokenizer.cursor += 1;
+                        },
+                        // TODO: '['
+                        else => {
+                            // TODO: dtd stuff
+                            unreachable{};
+                        },
+                    }
+                },
+                CommentStart_2 => {
+                    switch (c) {
+                        '-' => {
+                            tokenizer.mode = Mode.InsideComment;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            // "<!-x"
+                            tokenizer.mode = Mode.None;
+                            output_tokens[output_count] = XmlToken{
+                                .token_type = TokenType.Invalid,
+                                .start = token_start,
+                                .end = tokenizer.cursor,
+                            };
+                            output_count += 1;
+                            if (output_count >= output_tokens.len) return output_count;
+                        },
+                    }
+                },
+                InsideComment => {
+                    switch (c) {
+                        '-' => {
+                            tokenizer.mode = Mode.CommentEnd_0;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.cursor += 1;
+                        },
+                    }
+                },
+                CommentEnd_0 => {
+                    switch (c) {
+                        '-' => {
+                            tokenizer.mode = Mode.CommentEnd_1;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.mode = Mode.InsideComment;
+                            tokenizer.cursor += 1;
+                        },
+                    }
+                },
+                CommentEnd_1 => {
+                    switch (c) {
+                        '>' => {
+                            tokenizer.mode = Mode.None;
+                            output_tokens[output_count] = XmlToken{
+                                .token_type = TokenType.Comment,
+                                .start = token_start,
+                                .end = tokenizer.cursor + 1,
+                            };
+                            output_count += 1;
+                            tokenizer.cursor += 1;
+                            if (output_count >= output_tokens.len) return output_count;
+                        },
+                        else => {
+                            // technically an error, but we tolerate it.
+                            tokenizer.cursor += 1;
+                        },
+                    }
+                },
             }
         }
 
@@ -436,6 +521,18 @@ fn xml_tags_and_text_test() {
     test_all_at_once(source, expected_tokens);
 }
 
+#attribute("test")
+fn xml_simple_comment_test() {
+    const source = "<!-- comment -->";
+    const expected_tokens = []?XmlToken{
+        XmlToken{
+            .token_type = TokenType.Comment,
+            .start = 0, .end = source.len,
+        },
+    };
+    test_all_at_once(source, expected_tokens);
+}
+
 //TODO: #attribute("test")
 fn xml_complex_test() {
     const source = r"XML(
@@ -452,7 +549,7 @@ fn xml_complex_test() {
   <group name="Group 2" type="Crazy">
     <a-:_2. quot='"' apos="'"
         elements="&amp;&lt;&gt;&apos;&quot;"/>
-        characters="&#9;, &#x10FFFF;, &#1114111"
+        characters="&#9;, &#x10FFFF;, &#1114111;"
     <![CDATA[<literal text="in">a &quot;<![CDATA[>/literal>]]>
     <!--
       comment <contains> &apos; </stuff>
