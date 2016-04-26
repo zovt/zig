@@ -17,6 +17,7 @@ pub struct XmlToken {
     token_type: TokenType,
     start: isize,
     end: isize,
+    is_partial: bool,
 }
 
 enum Mode {
@@ -42,8 +43,9 @@ pub struct XmlTokenizer {
     is_eof: bool,
     src_buf_offset: isize,
     cursor: isize,
-    token_start: isize,
     mode: Mode,
+    token_start: isize,
+    token_type: TokenType,
 
     pub fn init() -> XmlTokenizer {
         XmlTokenizer {
@@ -51,13 +53,14 @@ pub struct XmlTokenizer {
             .is_eof = false,
             .src_buf_offset = 0,
             .cursor = 0,
-            .token_start = undefined,
             .mode = Mode.None,
+            .token_start = undefined,
+            .token_type = undefined,
         }
     }
 
     pub fn load(tokenizer: &XmlTokenizer, source_buffer: []const u8, is_eof: bool) {
-        assert(tokenizer.cursor == tokenizer.src_buf.len);
+        assert(tokenizer.cursor - tokenizer.src_buf_offset == tokenizer.src_buf.len);
         assert(!tokenizer.is_eof);
         tokenizer.src_buf_offset += tokenizer.src_buf.len;
         tokenizer.src_buf = source_buffer;
@@ -66,6 +69,9 @@ pub struct XmlTokenizer {
     pub fn read_tokens(tokenizer: &XmlTokenizer, output_tokens: []XmlToken) -> isize {
         assert(output_tokens.len > 0);
         var output_count: isize = 0;
+        // these aliases make calls to put_token() look shorter
+        const a1 = &output_tokens;
+        const a2 = &output_count;
         while (tokenizer.cursor - tokenizer.src_buf_offset < tokenizer.src_buf.len) {
             const c = tokenizer.src_buf[tokenizer.cursor - tokenizer.src_buf_offset];
             switch (tokenizer.mode) {
@@ -79,6 +85,7 @@ pub struct XmlTokenizer {
                         else => {
                             tokenizer.mode = Mode.Text;
                             tokenizer.token_start = tokenizer.cursor;
+                            tokenizer.token_type = TokenType.Text;
                             tokenizer.cursor += 1;
                         },
                     }
@@ -88,7 +95,7 @@ pub struct XmlTokenizer {
                         '<' => {
                             // done
                             tokenizer.mode = Mode.None;
-                            if (put_token(&output_tokens, &output_count, TokenType.Text, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // not done
@@ -101,6 +108,7 @@ pub struct XmlTokenizer {
                     switch (c) {
                         '/' => {
                             tokenizer.mode = Mode.EndTagName;
+                            tokenizer.token_type = TokenType.EndTagStart;
                             tokenizer.cursor += 1;
                         },
                         '!' => {
@@ -110,6 +118,7 @@ pub struct XmlTokenizer {
                         // TODO: '?'
                         else => {
                             tokenizer.mode = Mode.StartTagName;
+                            tokenizer.token_type = TokenType.StartTagStart;
                         },
                     }
                 },
@@ -118,7 +127,7 @@ pub struct XmlTokenizer {
                         ' ', '\t', '\n', '\r', '/', '>' => {
                             // done
                             tokenizer.mode = Mode.InsideStartTag;
-                            if (put_token(&output_tokens, &output_count, TokenType.StartTagStart, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // not done
@@ -135,7 +144,7 @@ pub struct XmlTokenizer {
                         '>' => {
                             tokenizer.mode = Mode.None;
                             defer tokenizer.cursor += 1;
-                            if (put_token(&output_tokens, &output_count, TokenType.StartTagEnd, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, TokenType.StartTagEnd, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                         '/' => {
                             tokenizer.mode = Mode.TagSelfClose_0;
@@ -143,20 +152,23 @@ pub struct XmlTokenizer {
                         },
                         '=' => {
                             defer tokenizer.cursor += 1;
-                            if (put_token(&output_tokens, &output_count, TokenType.AttributeEquals, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, TokenType.AttributeEquals, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                         '"' => {
                             tokenizer.mode = Mode.AttributeValueDoubleQuote;
                             tokenizer.token_start = tokenizer.cursor;
+                            tokenizer.token_type = TokenType.AttributeValue;
                             tokenizer.cursor += 1;
                         },
                         '\'' => {
                             tokenizer.mode = Mode.AttributeValueSingleQuote;
                             tokenizer.token_start = tokenizer.cursor;
+                            tokenizer.token_type = TokenType.AttributeValue;
                             tokenizer.cursor += 1;
                         },
                         else => {
                             tokenizer.mode = Mode.AttributeName;
+                            tokenizer.token_type = TokenType.AttributeName;
                             tokenizer.token_start = tokenizer.cursor;
                         },
                     }
@@ -166,12 +178,12 @@ pub struct XmlTokenizer {
                         '>' => {
                             tokenizer.mode = Mode.None;
                             defer tokenizer.cursor += 1;
-                            if (put_token(&output_tokens, &output_count, TokenType.TagSelfClose, tokenizer.cursor - 1, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, TokenType.TagSelfClose, tokenizer.cursor - 1, tokenizer.cursor + 1)) goto done;
                         },
                         else => {
                             // invalid '/'
                             tokenizer.mode = Mode.InsideStartTag;
-                            if (put_token(&output_tokens, &output_count, TokenType.Invalid, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, TokenType.Invalid, tokenizer.cursor - 1, tokenizer.cursor)) goto done;
                         },
                     }
                 },
@@ -180,7 +192,7 @@ pub struct XmlTokenizer {
                         ' ', '\t', '\n', '\r', '>' => {
                             // done
                             tokenizer.mode = Mode.InsideEndTag;
-                            if (put_token(&output_tokens, &output_count, TokenType.EndTagStart, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // not done
@@ -194,7 +206,7 @@ pub struct XmlTokenizer {
                             // done
                             tokenizer.mode = Mode.None;
                             defer tokenizer.cursor += 1;
-                            if (put_token(&output_tokens, &output_count, TokenType.EndTagEnd, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, TokenType.EndTagEnd, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                         ' ', '\t', '\n', '\r' => {
                             // skip
@@ -203,7 +215,7 @@ pub struct XmlTokenizer {
                         else => {
                             // invalid characters between "</name" and ">"
                             defer tokenizer.cursor += 1;
-                            if (put_token(&output_tokens, &output_count, TokenType.Invalid, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, TokenType.Invalid, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                     }
                 },
@@ -212,7 +224,7 @@ pub struct XmlTokenizer {
                         ' ', '\t', '\n', '\r', '=', '/', '>', '"', '\'' => {
                             // done
                             tokenizer.mode = Mode.InsideStartTag;
-                            if (put_token(&output_tokens, &output_count, TokenType.AttributeName, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // not done
@@ -226,7 +238,7 @@ pub struct XmlTokenizer {
                             // done
                             tokenizer.mode = Mode.InsideStartTag;
                             defer tokenizer.cursor += 1;
-                            if (put_token(&output_tokens, &output_count, TokenType.AttributeValue, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
                         },
                         else => {
                             // not done
@@ -240,7 +252,7 @@ pub struct XmlTokenizer {
                             // done
                             tokenizer.mode = Mode.InsideStartTag;
                             defer tokenizer.cursor += 1;
-                            if (put_token(&output_tokens, &output_count, TokenType.AttributeValue, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
                         },
                         else => {
                             // not done
@@ -253,6 +265,7 @@ pub struct XmlTokenizer {
                     switch (c) {
                         '-' => {
                             tokenizer.mode = Mode.CommentStart_2;
+                            tokenizer.token_type = TokenType.Comment;
                             tokenizer.cursor += 1;
                         },
                         // TODO: '['
@@ -271,7 +284,7 @@ pub struct XmlTokenizer {
                         else => {
                             // "<!-x"
                             tokenizer.mode = Mode.None;
-                            if (put_token(&output_tokens, &output_count, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                     }
                 },
@@ -303,7 +316,7 @@ pub struct XmlTokenizer {
                         '>' => {
                             tokenizer.mode = Mode.None;
                             defer tokenizer.cursor += 1;
-                            if (put_token(&output_tokens, &output_count, TokenType.Comment, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
                         },
                         else => {
                             // technically an error, but we tolerate it.
@@ -314,6 +327,7 @@ pub struct XmlTokenizer {
             }
         }
 
+        // the input buffer has been exhausted
         if (tokenizer.is_eof) {
             switch (tokenizer.mode) {
                 None => {
@@ -322,11 +336,23 @@ pub struct XmlTokenizer {
                 Text => {
                     // flush the last text
                     tokenizer.mode = Mode.None;
-                    if (put_token(&output_tokens, &output_count, TokenType.Text, tokenizer.token_start, tokenizer.cursor)) goto done;
+                    if (put_token(a1, a2, TokenType.Text, tokenizer.token_start, tokenizer.cursor)) goto done;
                 },
                 else => {
                     // TODO: report early EOF
                     unreachable{};
+                },
+            }
+        } else {
+            switch (tokenizer.mode) {
+                None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
+                SpecialTagStart, CommentStart_2, CommentEnd_0, CommentEnd_1 => {
+                    // no partial tokens for these
+                },
+                Text, StartTagName, EndTagName, AttributeName, InsideComment,
+                AttributeValueDoubleQuote, AttributeValueSingleQuote => {
+                    // publish what we got so far
+                    put_partial_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor);
                 },
             }
         }
@@ -334,11 +360,18 @@ pub struct XmlTokenizer {
         return output_count;
     }
 }
+fn put_partial_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize) {
+    put_exact_token(output_tokens, output_count, token_type, start, end, true);
+}
 fn put_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize) -> bool {
+    return put_exact_token(output_tokens, output_count, token_type, start, end, false);
+}
+fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize, is_partial: bool) -> bool {
     (*output_tokens)[*output_count] = XmlToken{
         .token_type = token_type,
         .start = start,
         .end = end,
+        .is_partial = is_partial,
     };
     *output_count += 1;
     return *output_count >= output_tokens.len;
@@ -350,30 +383,30 @@ fn xml_tag_test() {
     const expected_tokens = []?XmlToken{
         XmlToken{ // "<a"
             .token_type = TokenType.StartTagStart,
-            .start = 0, .end = 2,
+            .start = 0, .end = 2, .is_partial = false,
         },
         XmlToken{ // ">"
             .token_type = TokenType.StartTagEnd,
-            .start = 2, .end = 3,
+            .start = 2, .end = 3, .is_partial = false,
         },
         XmlToken{ // "<b"
             .token_type = TokenType.StartTagStart,
-            .start = 3, .end = 5,
+            .start = 3, .end = 5, .is_partial = false,
         },
         XmlToken{ // "/>"
             .token_type = TokenType.TagSelfClose,
-            .start = 5, .end = 7,
+            .start = 5, .end = 7, .is_partial = false,
         },
         XmlToken{ // "</a"
             .token_type = TokenType.EndTagStart,
-            .start = 7, .end = 10,
+            .start = 7, .end = 10, .is_partial = false,
         },
         XmlToken{ // ">"
             .token_type = TokenType.EndTagEnd,
-            .start = 10, .end = 11,
+            .start = 10, .end = 11, .is_partial = false,
         },
     };
-    test_all_at_once(source, expected_tokens);
+    test_every_which_way(source, expected_tokens);
 }
 
 #attribute("test")
@@ -382,38 +415,38 @@ fn xml_attribute_test() {
     const expected_tokens = []?XmlToken{
         XmlToken{ // "<b"
             .token_type = TokenType.StartTagStart,
-            .start = 0, .end = 2,
+            .start = 0, .end = 2, .is_partial = false,
         },
         XmlToken{ // "a"
             .token_type = TokenType.AttributeName,
-            .start = 3, .end = 4,
+            .start = 3, .end = 4, .is_partial = false,
         },
         XmlToken{ // "="
             .token_type = TokenType.AttributeEquals,
-            .start = 4, .end = 5,
+            .start = 4, .end = 5, .is_partial = false,
         },
         XmlToken{ // "\"c\""
             .token_type = TokenType.AttributeValue,
-            .start = 5, .end = 8,
+            .start = 5, .end = 8, .is_partial = false,
         },
         XmlToken{ // "de"
             .token_type = TokenType.AttributeName,
-            .start = 9, .end = 11,
+            .start = 9, .end = 11, .is_partial = false,
         },
         XmlToken{ // "="
             .token_type = TokenType.AttributeEquals,
-            .start = 11, .end = 12,
+            .start = 11, .end = 12, .is_partial = false,
         },
         XmlToken{ // "'fg'"
             .token_type = TokenType.AttributeValue,
-            .start = 12, .end = 16,
+            .start = 12, .end = 16, .is_partial = false,
         },
         XmlToken{ // "/>"
             .token_type = TokenType.TagSelfClose,
-            .start = 16, .end = 18,
+            .start = 16, .end = 18, .is_partial = false,
         },
     };
-    test_all_at_once(source, expected_tokens);
+    test_every_which_way(source, expected_tokens);
 }
 
 #attribute("test")
@@ -422,10 +455,11 @@ fn xml_simple_text_test() {
     const expected_tokens = []?XmlToken{
         XmlToken{
             .token_type = TokenType.Text,
-            .start = 0, .end = 4,
+            .start = 0, .end = 4, .is_partial = false,
         },
     };
-    test_all_at_once(source, expected_tokens);
+    //@breakpoint();
+    test_every_which_way(source, expected_tokens);
 }
 #attribute("test")
 fn xml_tags_and_text_test() {
@@ -433,22 +467,22 @@ fn xml_tags_and_text_test() {
     const expected_tokens = []?XmlToken{
         XmlToken{ // "a "
             .token_type = TokenType.Text,
-            .start = 0, .end = 2,
+            .start = 0, .end = 2, .is_partial = false,
         },
         XmlToken{ // "<b"
             .token_type = TokenType.StartTagStart,
-            .start = 2, .end = 4,
+            .start = 2, .end = 4, .is_partial = false,
         },
         XmlToken{ // "/>"
             .token_type = TokenType.TagSelfClose,
-            .start = 4, .end = 6,
+            .start = 4, .end = 6, .is_partial = false,
         },
         XmlToken{ // " c"
             .token_type = TokenType.Text,
-            .start = 6, .end = 8,
+            .start = 6, .end = 8, .is_partial = false,
         },
     };
-    test_all_at_once(source, expected_tokens);
+    test_every_which_way(source, expected_tokens);
 }
 
 #attribute("test")
@@ -457,10 +491,10 @@ fn xml_simple_comment_test() {
     const expected_tokens = []?XmlToken{
         XmlToken{
             .token_type = TokenType.Comment,
-            .start = 0, .end = source.len,
+            .start = 0, .end = source.len, .is_partial = false,
         },
     };
-    test_all_at_once(source, expected_tokens);
+    test_every_which_way(source, expected_tokens);
 }
 
 //TODO: #attribute("test")
@@ -490,9 +524,14 @@ fn xml_complex_test() {
     const expected_tokens = []?XmlToken{
         // TODO
     };
-    test_all_at_once(source, expected_tokens);
+    test_every_which_way(source, expected_tokens);
 }
 
+
+fn test_every_which_way(source: []const u8, expected_tokens: []?XmlToken) {
+    test_all_at_once(source, expected_tokens);
+    test_chopped_input(source, expected_tokens);
+}
 fn test_all_at_once(source: []const u8, expected_tokens: []?XmlToken) {
     var tokens: [0x1000]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
@@ -509,31 +548,39 @@ fn token_equals(a: XmlToken, b: XmlToken) -> bool {
     a.token_type == b.token_type &&
     a.start      == b.start      &&
     a.end        == b.end        &&
+    //a.is_partial == b.is_partial &&
     true
 }
 
 fn test_chopped_input(source: []const u8, expected_tokens: []?XmlToken) {
-    var complete_tokens: [0x1000]XmlToken = undefined;
+    var tokens: [0x1000]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
     var output_cursor: isize = 0;
-    var token_start: isize = undefined;
-    for (source) |c, input_cursor| {
-        tokenizer.load([]u8{c}, true);
+    var input_cursor: isize = 0;
+    while (input_cursor <= source.len; input_cursor += 1) {
+        if (input_cursor < source.len) {
+            tokenizer.load(source[input_cursor...input_cursor + 1], false);
+        } else {
+            tokenizer.load([]u8{}, true);
+        }
         var output_tokens: [3]XmlToken = undefined;
         const output_count = tokenizer.read_tokens(output_tokens);
         switch (output_count) {
             0 => continue,
             1, 2 => {
-                // collect the data from the tokens
-                for (output_tokens) |output_token| {
-                    // TODO:
-                    //if (complete_tokens[output_cursor].is_partial) {
-                    //}
+                // 2 tokens is possible when feeding the ">" of "<a>"
+                for (output_tokens[0...output_count]) |output_token| {
+                    if (output_cursor > 0 && tokens[output_cursor - 1].is_partial) {
+                        const tmp = tokens[output_cursor - 1].start;
+                        tokens[output_cursor - 1] = output_token;
+                        tokens[output_cursor - 1].start = tmp;
+                    } else {
+                        tokens[output_cursor] = output_token;
+                        output_cursor += 1;
+                    }
                 }
             },
             3 => unreachable{},
-        }
-        if (output_count > 0) {
         }
     }
 
@@ -541,7 +588,7 @@ fn test_chopped_input(source: []const u8, expected_tokens: []?XmlToken) {
 
     for (expected_tokens) |maybe_expected_token, i| {
         if (const expected_token ?= maybe_expected_token) {
-            assert(token_equals(expected_token, complete_tokens[i]));
+            assert(token_equals(expected_token, tokens[i]));
         }
     }
 }
