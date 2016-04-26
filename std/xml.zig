@@ -548,7 +548,7 @@ fn token_equals(a: XmlToken, b: XmlToken) -> bool {
     a.token_type == b.token_type &&
     a.start      == b.start      &&
     a.end        == b.end        &&
-    //a.is_partial == b.is_partial &&
+    a.is_partial == b.is_partial &&
     true
 }
 
