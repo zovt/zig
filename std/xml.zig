@@ -1,4 +1,5 @@
 const assert = @import("std").assert;
+const str_eql = @import("std").str.eql;
 
 pub enum TokenType {
     Invalid,
@@ -359,6 +360,39 @@ pub struct XmlTokenizer {
         done:
         return output_count;
     }
+    pub fn copy_content(tokenizer: &XmlTokenizer, token: XmlToken, output_buf: []u8) -> isize {
+        var skip_start: isize = undefined;
+        var skip_end: isize = 0;
+        switch (token.token_type) {
+            Invalid, StartTagEnd, TagSelfClose, EndTagEnd, AttributeEquals => {
+                // no text content at all
+                return 0;
+            },
+            Text, AttributeName => {
+                skip_start = 0;
+            },
+            StartTagStart => {
+                skip_start = 1;
+            },
+            AttributeValue => {
+                skip_start = 1;
+                skip_end = 1;
+            },
+            EndTagStart => {
+                skip_start = 2;
+            },
+            Comment => {
+                skip_start = 4;
+                skip_end = 3;
+            },
+        };
+        const local_start = token.start + skip_start - tokenizer.src_buf_offset;
+        const local_end = token.end - skip_end - tokenizer.src_buf_offset;
+        const len = local_end - local_start;
+        assert(output_buf.len >= len);
+        @memcpy(&output_buf[0], &tokenizer.src_buf[local_start], len);
+        return len;
+    }
 }
 fn put_partial_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize) {
     put_exact_token(output_tokens, output_count, token_type, start, end, true);
@@ -380,31 +414,13 @@ fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, token_type:
 #attribute("test")
 fn xml_tag_test() {
     const source = "<a><b/></a>";
-    const expected_tokens = []?XmlToken{
-        XmlToken{ // "<a"
-            .token_type = TokenType.StartTagStart,
-            .start = 0, .end = 2, .is_partial = false,
-        },
-        XmlToken{ // ">"
-            .token_type = TokenType.StartTagEnd,
-            .start = 2, .end = 3, .is_partial = false,
-        },
-        XmlToken{ // "<b"
-            .token_type = TokenType.StartTagStart,
-            .start = 3, .end = 5, .is_partial = false,
-        },
-        XmlToken{ // "/>"
-            .token_type = TokenType.TagSelfClose,
-            .start = 5, .end = 7, .is_partial = false,
-        },
-        XmlToken{ // "</a"
-            .token_type = TokenType.EndTagStart,
-            .start = 7, .end = 10, .is_partial = false,
-        },
-        XmlToken{ // ">"
-            .token_type = TokenType.EndTagEnd,
-            .start = 10, .end = 11, .is_partial = false,
-        },
+    const expected_tokens = []?ExpectedToken{
+        make_token(TokenType.StartTagStart, 0, 2, "a"),
+        make_token(TokenType.StartTagEnd, 2, 3, ""),
+        make_token(TokenType.StartTagStart, 3, 5, "b"),
+        make_token(TokenType.TagSelfClose, 5, 7, ""),
+        make_token(TokenType.EndTagStart, 7, 10, "a"),
+        make_token(TokenType.EndTagEnd, 10, 11, ""),
     };
     test_every_which_way(source, expected_tokens);
 }
@@ -412,39 +428,15 @@ fn xml_tag_test() {
 #attribute("test")
 fn xml_attribute_test() {
     const source = r"XML(<b a="c" de='fg'/>)XML";
-    const expected_tokens = []?XmlToken{
-        XmlToken{ // "<b"
-            .token_type = TokenType.StartTagStart,
-            .start = 0, .end = 2, .is_partial = false,
-        },
-        XmlToken{ // "a"
-            .token_type = TokenType.AttributeName,
-            .start = 3, .end = 4, .is_partial = false,
-        },
-        XmlToken{ // "="
-            .token_type = TokenType.AttributeEquals,
-            .start = 4, .end = 5, .is_partial = false,
-        },
-        XmlToken{ // "\"c\""
-            .token_type = TokenType.AttributeValue,
-            .start = 5, .end = 8, .is_partial = false,
-        },
-        XmlToken{ // "de"
-            .token_type = TokenType.AttributeName,
-            .start = 9, .end = 11, .is_partial = false,
-        },
-        XmlToken{ // "="
-            .token_type = TokenType.AttributeEquals,
-            .start = 11, .end = 12, .is_partial = false,
-        },
-        XmlToken{ // "'fg'"
-            .token_type = TokenType.AttributeValue,
-            .start = 12, .end = 16, .is_partial = false,
-        },
-        XmlToken{ // "/>"
-            .token_type = TokenType.TagSelfClose,
-            .start = 16, .end = 18, .is_partial = false,
-        },
+    const expected_tokens = []?ExpectedToken{
+        make_token(TokenType.StartTagStart, 0, 2, "b"),
+        make_token(TokenType.AttributeName, 3, 4, "a"),
+        make_token(TokenType.AttributeEquals, 4, 5, ""),
+        make_token(TokenType.AttributeValue, 5, 8, "c"),
+        make_token(TokenType.AttributeName, 9, 11, "de"),
+        make_token(TokenType.AttributeEquals, 11, 12, ""),
+        make_token(TokenType.AttributeValue, 12, 16, "fg"),
+        make_token(TokenType.TagSelfClose, 16, 18, ""),
     };
     test_every_which_way(source, expected_tokens);
 }
@@ -452,34 +444,19 @@ fn xml_attribute_test() {
 #attribute("test")
 fn xml_simple_text_test() {
     const source = "text";
-    const expected_tokens = []?XmlToken{
-        XmlToken{
-            .token_type = TokenType.Text,
-            .start = 0, .end = 4, .is_partial = false,
-        },
+    const expected_tokens = []?ExpectedToken{
+        make_token(TokenType.Text, 0, 4, "text"),
     };
     test_every_which_way(source, expected_tokens);
 }
 #attribute("test")
 fn xml_tags_and_text_test() {
     const source = "a <b/> c";
-    const expected_tokens = []?XmlToken{
-        XmlToken{ // "a "
-            .token_type = TokenType.Text,
-            .start = 0, .end = 2, .is_partial = false,
-        },
-        XmlToken{ // "<b"
-            .token_type = TokenType.StartTagStart,
-            .start = 2, .end = 4, .is_partial = false,
-        },
-        XmlToken{ // "/>"
-            .token_type = TokenType.TagSelfClose,
-            .start = 4, .end = 6, .is_partial = false,
-        },
-        XmlToken{ // " c"
-            .token_type = TokenType.Text,
-            .start = 6, .end = 8, .is_partial = false,
-        },
+    const expected_tokens = []?ExpectedToken{
+        make_token(TokenType.Text, 0, 2, "a "),
+        make_token(TokenType.StartTagStart, 2, 4, "b"),
+        make_token(TokenType.TagSelfClose, 4, 6, ""),
+        make_token(TokenType.Text, 6, 8, " c"),
     };
     test_every_which_way(source, expected_tokens);
 }
@@ -487,11 +464,8 @@ fn xml_tags_and_text_test() {
 #attribute("test")
 fn xml_simple_comment_test() {
     const source = "<!-- comment -->";
-    const expected_tokens = []?XmlToken{
-        XmlToken{
-            .token_type = TokenType.Comment,
-            .start = 0, .end = source.len, .is_partial = false,
-        },
+    const expected_tokens = []?ExpectedToken{
+        make_token(TokenType.Comment, 0, source.len, " comment "),
     };
     test_every_which_way(source, expected_tokens);
 }
@@ -520,12 +494,27 @@ fn xml_complex_test() {
   </group>
 </root>
 )XML";
-    const expected_tokens = []?XmlToken{
+    const expected_tokens = []?ExpectedToken{
         // TODO
     };
     test_every_which_way(source, expected_tokens);
 }
 
+struct ExpectedToken {
+    token: XmlToken,
+    text: []const u8,
+}
+fn make_token(token_type: TokenType, start: isize, end: isize, text: []const u8) -> ExpectedToken {
+    ExpectedToken{
+        .token = XmlToken{
+            .token_type = token_type,
+            .start = start,
+            .end = end,
+            .is_partial = false,
+        },
+        .text = text,
+    }
+}
 fn token_equals(a: XmlToken, b: XmlToken) -> bool {
     a.token_type == b.token_type &&
     a.start      == b.start      &&
@@ -533,13 +522,13 @@ fn token_equals(a: XmlToken, b: XmlToken) -> bool {
     a.is_partial == b.is_partial &&
     true
 }
-fn test_every_which_way(source: []const u8, expected_tokens: []?XmlToken) {
+fn test_every_which_way(source: []const u8, expected_tokens: []?ExpectedToken) {
     test_all_at_once(source, expected_tokens);
     test_constrained_output(source, expected_tokens);
     test_chopped_input(source, expected_tokens);
 }
 
-fn test_all_at_once(source: []const u8, expected_tokens: []?XmlToken) {
+fn test_all_at_once(source: []const u8, expected_tokens: []?ExpectedToken) {
     var tokens: [0x1000]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
     tokenizer.load(source, true);
@@ -547,12 +536,16 @@ fn test_all_at_once(source: []const u8, expected_tokens: []?XmlToken) {
     assert(output_count == expected_tokens.len);
     for (expected_tokens) |maybe_expected_token, i| {
         if (const expected_token ?= maybe_expected_token) {
-            assert(token_equals(expected_token, tokens[i]));
+            assert(token_equals(expected_token.token, tokens[i]));
+
+            var buf: [0x1000]u8 = undefined;
+            const text = buf[0...tokenizer.copy_content(tokens[i], buf)];
+            assert(str_eql(expected_token.text, text));
         }
     }
 }
 
-fn test_constrained_output(source: []const u8, expected_tokens: []?XmlToken) {
+fn test_constrained_output(source: []const u8, expected_tokens: []?ExpectedToken) {
     var tokens: [1]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
     tokenizer.load(source, true);
@@ -560,14 +553,14 @@ fn test_constrained_output(source: []const u8, expected_tokens: []?XmlToken) {
         const output_count = tokenizer.read_tokens(tokens);
         assert(output_count == 1);
         if (const expected_token ?= maybe_expected_token) {
-            assert(token_equals(expected_token, tokens[0]));
+            assert(token_equals(expected_token.token, tokens[0]));
         }
     }
     const output_count = tokenizer.read_tokens(tokens);
     assert(output_count == 0);
 }
 
-fn test_chopped_input(source: []const u8, expected_tokens: []?XmlToken) {
+fn test_chopped_input(source: []const u8, expected_tokens: []?ExpectedToken) {
     var tokens: [0x1000]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
     var output_cursor: isize = 0;
@@ -603,7 +596,7 @@ fn test_chopped_input(source: []const u8, expected_tokens: []?XmlToken) {
 
     for (expected_tokens) |maybe_expected_token, i| {
         if (const expected_token ?= maybe_expected_token) {
-            assert(token_equals(expected_token, tokens[i]));
+            assert(token_equals(expected_token.token, tokens[i]));
         }
     }
 }
