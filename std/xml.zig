@@ -14,11 +14,20 @@ pub enum TokenType {
     AttributeValue,  // ("<name ") "'value'", '"value"'
     Comment,         // "<!--text-->"
 }
+pub const continuation_flag = 1;
+pub const unfinished_flag = 2;
 pub struct XmlToken {
     token_type: TokenType,
+    flags: u8,
     start: isize,
     end: isize,
-    is_partial: bool,
+
+    pub fn is_continuation(token: XmlToken) -> bool {
+        token.flags & continuation_flag != 0
+    }
+    pub fn is_unfinished(token: XmlToken) -> bool {
+        token.flags & unfinished_flag != 0
+    }
 }
 
 enum Mode {
@@ -45,6 +54,7 @@ pub struct XmlTokenizer {
     src_buf_offset: isize,
     cursor: isize,
     mode: Mode,
+    need_continuation: bool,
     token_start: isize,
     token_type: TokenType,
 
@@ -55,6 +65,7 @@ pub struct XmlTokenizer {
             .src_buf_offset = 0,
             .cursor = 0,
             .mode = Mode.None,
+            .need_continuation = false,
             .token_start = undefined,
             .token_type = undefined,
         }
@@ -73,6 +84,7 @@ pub struct XmlTokenizer {
         // these aliases make calls to put_token() look shorter
         const a1 = &output_tokens;
         const a2 = &output_count;
+        const a3 = tokenizer.need_continuation;
         while (tokenizer.cursor - tokenizer.src_buf_offset < tokenizer.src_buf.len) {
             const c = tokenizer.src_buf[tokenizer.cursor - tokenizer.src_buf_offset];
             switch (tokenizer.mode) {
@@ -329,7 +341,18 @@ pub struct XmlTokenizer {
         }
 
         // the input buffer has been exhausted
-        if (tokenizer.is_eof) {
+        if (!tokenizer.is_eof) {
+            // flush any partial content spanning chunk boundaries
+            if (mode_has_text_content(tokenizer.mode)) {
+                // publish what we got so far
+                put_unfinished_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor);
+                tokenizer.need_continuation = true;
+            } else {
+                // no partial tokens for these
+                tokenizer.need_continuation = false;
+            }
+        } else {
+            // the is the end
             switch (tokenizer.mode) {
                 None => {
                     // all good
@@ -342,18 +365,6 @@ pub struct XmlTokenizer {
                 else => {
                     // TODO: report early EOF
                     unreachable{};
-                },
-            }
-        } else {
-            switch (tokenizer.mode) {
-                None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
-                SpecialTagStart, CommentStart_2, CommentEnd_0, CommentEnd_1 => {
-                    // no partial tokens for these
-                },
-                Text, StartTagName, EndTagName, AttributeName, InsideComment,
-                AttributeValueDoubleQuote, AttributeValueSingleQuote => {
-                    // publish what we got so far
-                    put_partial_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor);
                 },
             }
         }
@@ -386,6 +397,12 @@ pub struct XmlTokenizer {
                 skip_end = 3;
             },
         };
+        if (token.is_continuation()) {
+            skip_start = 0;
+        }
+        if (token.is_unfinished()) {
+            skip_end = 0;
+        }
         const local_start = token.start + skip_start - tokenizer.src_buf_offset;
         const local_end = token.end - skip_end - tokenizer.src_buf_offset;
         const len = local_end - local_start;
@@ -394,21 +411,30 @@ pub struct XmlTokenizer {
         return len;
     }
 }
-fn put_partial_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize) {
-    put_exact_token(output_tokens, output_count, token_type, start, end, true);
+fn put_unfinished_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize) {
+    put_exact_token(output_tokens, output_count, token_type, start, end, unfinished_flag);
 }
 fn put_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize) -> bool {
-    return put_exact_token(output_tokens, output_count, token_type, start, end, false);
+    return put_exact_token(output_tokens, output_count, token_type, start, end, 0);
 }
-fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize, is_partial: bool) -> bool {
+fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize, flags: u8) -> bool {
     (*output_tokens)[*output_count] = XmlToken{
         .token_type = token_type,
+        .flags = flags,
         .start = start,
         .end = end,
-        .is_partial = is_partial,
     };
     *output_count += 1;
     return *output_count >= output_tokens.len;
+}
+fn mode_has_text_content(mode: Mode) -> bool {
+    return switch (mode) {
+        None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
+        SpecialTagStart, CommentStart_2, CommentEnd_0, CommentEnd_1 => false,
+
+        Text, StartTagName, EndTagName, AttributeName, InsideComment,
+        AttributeValueDoubleQuote, AttributeValueSingleQuote => true,
+    }
 }
 
 #attribute("test")
@@ -508,18 +534,18 @@ fn make_token(token_type: TokenType, start: isize, end: isize, text: []const u8)
     ExpectedToken{
         .token = XmlToken{
             .token_type = token_type,
+            .flags = 0,
             .start = start,
             .end = end,
-            .is_partial = false,
         },
         .text = text,
     }
 }
 fn token_equals(a: XmlToken, b: XmlToken) -> bool {
     a.token_type == b.token_type &&
+    a.flags      == b.flags      &&
     a.start      == b.start      &&
     a.end        == b.end        &&
-    a.is_partial == b.is_partial &&
     true
 }
 fn test_every_which_way(source: []const u8, expected_tokens: []?ExpectedToken) {
@@ -554,6 +580,10 @@ fn test_constrained_output(source: []const u8, expected_tokens: []?ExpectedToken
         assert(output_count == 1);
         if (const expected_token ?= maybe_expected_token) {
             assert(token_equals(expected_token.token, tokens[0]));
+
+            var buf: [0x1000]u8 = undefined;
+            const text = buf[0...tokenizer.copy_content(tokens[0], buf)];
+            assert(str_eql(expected_token.text, text));
         }
     }
     const output_count = tokenizer.read_tokens(tokens);
@@ -561,9 +591,13 @@ fn test_constrained_output(source: []const u8, expected_tokens: []?ExpectedToken
 }
 
 fn test_chopped_input(source: []const u8, expected_tokens: []?ExpectedToken) {
-    var tokens: [0x1000]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
-    var output_cursor: isize = 0;
+    var scratch_token: XmlToken = undefined;
+    scratch_token.flags = 0;
+    var text_buf: [0x1000]u8 = undefined;
+    var text_len: isize = 0;
+
+    var complete_output_count: isize = 0;
     var input_cursor: isize = 0;
     while (input_cursor <= source.len; input_cursor += 1) {
         if (input_cursor < source.len) {
@@ -573,30 +607,32 @@ fn test_chopped_input(source: []const u8, expected_tokens: []?ExpectedToken) {
         }
         var output_tokens: [3]XmlToken = undefined;
         const output_count = tokenizer.read_tokens(output_tokens);
-        switch (output_count) {
-            0 => continue,
-            1, 2 => {
-                // 2 tokens is possible when feeding the ">" of "<a>"
-                for (output_tokens[0...output_count]) |output_token| {
-                    if (output_cursor > 0 && tokens[output_cursor - 1].is_partial) {
-                        const tmp = tokens[output_cursor - 1].start;
-                        tokens[output_cursor - 1] = output_token;
-                        tokens[output_cursor - 1].start = tmp;
-                    } else {
-                        tokens[output_cursor] = output_token;
-                        output_cursor += 1;
-                    }
+        // 2 tokens is possible when feeding the ">" of "<a>"
+        // 3 tokens is not possible
+        assert(output_count < 3);
+        for (output_tokens[0...output_count]) |output_token| {
+            if (scratch_token.is_unfinished()) {
+                assert(output_token.is_continuation());
+                // extend partial scratch token
+                const true_start = scratch_token.start;
+                scratch_token = output_token;
+                scratch_token.start = true_start;
+            } else {
+                assert(!output_token.is_continuation());
+                scratch_token = output_token;
+                text_len = 0;
+            }
+            text_len += tokenizer.copy_content(output_token, text_buf[text_len...]);
+            if (!output_token.is_unfinished()) {
+                assert(complete_output_count < expected_tokens.len);
+                if (const expected_token ?= expected_tokens[complete_output_count]) {
+                    assert(token_equals(expected_token.token, scratch_token));
+                    assert(str_eql(expected_token.text, text_buf[0...text_len]));
                 }
-            },
-            3 => unreachable{},
+                complete_output_count += 1;
+            }
         }
     }
 
-    assert(output_cursor == expected_tokens.len);
-
-    for (expected_tokens) |maybe_expected_token, i| {
-        if (const expected_token ?= maybe_expected_token) {
-            assert(token_equals(expected_token.token, tokens[i]));
-        }
-    }
+    assert(complete_output_count == expected_tokens.len);
 }
