@@ -458,7 +458,6 @@ fn xml_simple_text_test() {
             .start = 0, .end = 4, .is_partial = false,
         },
     };
-    //@breakpoint();
     test_every_which_way(source, expected_tokens);
 }
 #attribute("test")
@@ -527,11 +526,19 @@ fn xml_complex_test() {
     test_every_which_way(source, expected_tokens);
 }
 
-
+fn token_equals(a: XmlToken, b: XmlToken) -> bool {
+    a.token_type == b.token_type &&
+    a.start      == b.start      &&
+    a.end        == b.end        &&
+    a.is_partial == b.is_partial &&
+    true
+}
 fn test_every_which_way(source: []const u8, expected_tokens: []?XmlToken) {
     test_all_at_once(source, expected_tokens);
+    test_constrained_output(source, expected_tokens);
     test_chopped_input(source, expected_tokens);
 }
+
 fn test_all_at_once(source: []const u8, expected_tokens: []?XmlToken) {
     var tokens: [0x1000]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
@@ -544,12 +551,20 @@ fn test_all_at_once(source: []const u8, expected_tokens: []?XmlToken) {
         }
     }
 }
-fn token_equals(a: XmlToken, b: XmlToken) -> bool {
-    a.token_type == b.token_type &&
-    a.start      == b.start      &&
-    a.end        == b.end        &&
-    a.is_partial == b.is_partial &&
-    true
+
+fn test_constrained_output(source: []const u8, expected_tokens: []?XmlToken) {
+    var tokens: [1]XmlToken = undefined;
+    var tokenizer = XmlTokenizer.init();
+    tokenizer.load(source, true);
+    for (expected_tokens) |maybe_expected_token| {
+        const output_count = tokenizer.read_tokens(tokens);
+        assert(output_count == 1);
+        if (const expected_token ?= maybe_expected_token) {
+            assert(token_equals(expected_token, tokens[0]));
+        }
+    }
+    const output_count = tokenizer.read_tokens(tokens);
+    assert(output_count == 0);
 }
 
 fn test_chopped_input(source: []const u8, expected_tokens: []?XmlToken) {
