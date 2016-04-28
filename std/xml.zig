@@ -1,12 +1,6 @@
 const assert = @import("std").assert;
 const str_eql = @import("std").str.eql;
 
-#debug_safety(false)
-fn copy_slice(T: type)(dest: []T, src: []const T) {
-    assert(dest.len == src.len);
-    @memcpy(&dest[0], &src[0], src.len)
-}
-
 pub enum TokenType {
     Invalid,
     Text,            // "text outside tags"
@@ -411,8 +405,9 @@ pub struct XmlTokenizer {
         const local_start = token.start + skip_start - tokenizer.src_buf_offset;
         const local_end = token.end - skip_end - tokenizer.src_buf_offset;
         const len = local_end - local_start;
+        if (len == 0) return 0;
         assert(output_buf.len >= len);
-        copy_slice(u8)(output_buf[0...len], tokenizer.src_buf[local_start...local_start + len]);
+        @memcpy(&output_buf[0], &tokenizer.src_buf[local_start], len);
         return len;
     }
 }
