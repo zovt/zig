@@ -402,13 +402,28 @@ pub struct XmlTokenizer {
         if (token.is_unfinished()) {
             skip_end = 0;
         }
-        const local_start = token.start + skip_start - tokenizer.src_buf_offset;
-        const local_end = token.end - skip_end - tokenizer.src_buf_offset;
-        const len = local_end - local_start;
-        if (len == 0) return 0;
-        assert(output_buf.len >= len);
-        @memcpy(&output_buf[0], &tokenizer.src_buf[local_start], len);
-        return len;
+        var local_start = token.start + skip_start - tokenizer.src_buf_offset;
+        var local_end = token.end - skip_end - tokenizer.src_buf_offset;
+        var len = local_end - local_start;
+        const return_len = len;
+        var output_cursor: isize = 0;
+        while (local_start < 0 && len > 0; {local_start += 1; len -= 1}) {
+            // backfill the output buffer with whatever character was leading us to believe
+            // it was going to terminate this token, but really didn't.
+            const tease_char = switch (token.token_type) {
+                Comment => u8('-'),
+                // TODO: Cdata => ']',
+                else => unreachable{},
+            };
+            assert(output_buf.len >= output_cursor + 1);
+            output_buf[output_cursor] = tease_char;
+            output_cursor += 1;
+        }
+        if (len != 0) {
+            assert(output_buf.len >= output_cursor + len);
+            @memcpy(&output_buf[output_cursor], &tokenizer.src_buf[local_start], len);
+        }
+        return return_len;
     }
 }
 fn put_unfinished_token(output_tokens: &[]XmlToken, output_count: &isize, need_continuation: &bool, token_type: TokenType, start: isize, end: isize) {
@@ -496,6 +511,16 @@ fn xml_simple_comment_test() {
     const source = "<!-- comment -->";
     const expected_tokens = []?ExpectedToken{
         make_token(TokenType.Comment, 0, source.len, " comment "),
+    };
+    test_every_which_way(source, expected_tokens);
+}
+
+#attribute("test")
+fn xml_tricky_comment_test() {
+    // this is technically forbidden by the spec, but we should be able to handle it anyway.
+    const source = "<!------->";
+    const expected_tokens = []?ExpectedToken{
+        make_token(TokenType.Comment, 0, source.len, "---"),
     };
     test_every_which_way(source, expected_tokens);
 }
