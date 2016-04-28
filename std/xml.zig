@@ -344,9 +344,11 @@ pub struct XmlTokenizer {
         if (!tokenizer.is_eof) {
             // flush any partial content spanning chunk boundaries
             if (mode_has_text_content(tokenizer.mode)) {
-                // publish what we got so far
-                put_unfinished_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor);
-                tokenizer.token_start = tokenizer.cursor;
+                if (tokenizer.token_start != tokenizer.cursor) {
+                    // publish what we got so far
+                    put_unfinished_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor);
+                    tokenizer.token_start = tokenizer.cursor;
+                }
             } else {
                 // no partial tokens for these
             }
@@ -518,6 +520,7 @@ fn xml_simple_comment_test() {
 #attribute("test")
 fn xml_tricky_comment_test() {
     // this is technically forbidden by the spec, but we should be able to handle it anyway.
+    // TODO: test this with <![CDATA[]]]]]]> instead.
     const source = "<!------->";
     const expected_tokens = []?ExpectedToken{
         make_token(TokenType.Comment, 0, source.len, "---"),
@@ -577,13 +580,36 @@ fn token_equals(a: XmlToken, b: XmlToken) -> bool {
     a.end        == b.end        &&
     true
 }
-fn test_every_which_way(source: []const u8, expected_tokens: []?ExpectedToken) {
+fn test_every_which_way(source: []const u8, expected_tokens: []const ?ExpectedToken) {
     test_all_at_once(source, expected_tokens);
     test_constrained_output(source, expected_tokens);
-    test_chopped_input(source, expected_tokens);
+
+    // 1 byte at a time
+    {
+        var sources_array: [0x1000][]const u8 = undefined;
+        for (source) |_, i| {
+            sources_array[i] = source[i...i + 1];
+        }
+        test_streaming_input(sources_array[0...source.len], expected_tokens);
+    }
+
+    // test every possible seam
+    {
+        var cut_offset: isize = 0;
+        while (cut_offset < source.len + 1; cut_offset += 1) {
+            // TODO: this is the bug
+            //cut_offset = 14;
+            //@breakpoint();
+            var sources_array = [][]const u8{
+                source[0...cut_offset],
+                source[cut_offset...],
+            };
+            test_streaming_input(sources_array, expected_tokens);
+        }
+    }
 }
 
-fn test_all_at_once(source: []const u8, expected_tokens: []?ExpectedToken) {
+fn test_all_at_once(source: []const u8, expected_tokens: []const ?ExpectedToken) {
     var tokens: [0x1000]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
     tokenizer.load(source, true);
@@ -600,7 +626,7 @@ fn test_all_at_once(source: []const u8, expected_tokens: []?ExpectedToken) {
     }
 }
 
-fn test_constrained_output(source: []const u8, expected_tokens: []?ExpectedToken) {
+fn test_constrained_output(source: []const u8, expected_tokens: []const ?ExpectedToken) {
     var tokens: [1]XmlToken = undefined;
     var tokenizer = XmlTokenizer.init();
     tokenizer.load(source, true);
@@ -619,7 +645,7 @@ fn test_constrained_output(source: []const u8, expected_tokens: []?ExpectedToken
     assert(output_count == 0);
 }
 
-fn test_chopped_input(source: []const u8, expected_tokens: []?ExpectedToken) {
+fn test_streaming_input(sources: []const[]const u8, expected_tokens: []const ?ExpectedToken) {
     var tokenizer = XmlTokenizer.init();
     var scratch_token: XmlToken = undefined;
     scratch_token.flags = 0;
@@ -628,18 +654,19 @@ fn test_chopped_input(source: []const u8, expected_tokens: []?ExpectedToken) {
 
     var complete_output_count: isize = 0;
     var input_cursor: isize = 0;
-    while (input_cursor <= source.len; input_cursor += 1) {
-        if (input_cursor < source.len) {
-            tokenizer.load(source[input_cursor...input_cursor + 1], false);
+    while (input_cursor < sources.len + 1; input_cursor += 1) {
+        if (input_cursor < sources.len) {
+            tokenizer.load(sources[input_cursor], false);
         } else {
             tokenizer.load([]u8{}, true);
         }
-        var output_tokens: [3]XmlToken = undefined;
-        const output_count = tokenizer.read_tokens(output_tokens);
-        // 2 tokens is possible when feeding the ">" of "<a>"
-        // 3 tokens is not possible
-        assert(output_count < 3);
-        for (output_tokens[0...output_count]) |output_token| {
+        while (true) {
+            var output_tokens: [1]XmlToken = undefined;
+            const output_count = tokenizer.read_tokens(output_tokens);
+            if (output_count == 0) break;
+
+            assert(output_count == 1);
+            const output_token = output_tokens[0];
             if (scratch_token.is_unfinished()) {
                 assert(output_token.is_continuation());
                 // extend partial scratch token
