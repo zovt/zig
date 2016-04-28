@@ -14,19 +14,19 @@ pub enum TokenType {
     AttributeValue,  // ("<name ") "'value'", '"value"'
     Comment,         // "<!--text-->"
 }
-pub const continuation_flag = 1;
-pub const unfinished_flag = 2;
+pub const unfinished_flag: u8 = 1;
+pub const continuation_flag: u8 = 2;
 pub struct XmlToken {
     token_type: TokenType,
     flags: u8,
     start: isize,
     end: isize,
 
-    pub fn is_continuation(token: XmlToken) -> bool {
-        token.flags & continuation_flag != 0
-    }
     pub fn is_unfinished(token: XmlToken) -> bool {
         token.flags & unfinished_flag != 0
+    }
+    pub fn is_continuation(token: XmlToken) -> bool {
+        token.flags & continuation_flag != 0
     }
 }
 
@@ -37,14 +37,18 @@ enum Mode {
     StartTagName,   // "<n", "<name"
     InsideStartTag, // "<name "
     TagSelfClose_0, // ("<name ") "/"
+    EndTagStart_1,  // "</"
     EndTagName,     // "</", "</name"
     InsideEndTag,   // "</name "
     AttributeName,  // ("<name ") "a"
-    AttributeValueDoubleQuote, // ("<name ") '"'
-    AttributeValueSingleQuote, // ("<name ") "'"
+    AttributeValueDoubleQuote_0, // ("<name ") '"'
+    AttributeValueDoubleQuote,   // ("<name ") '"'
+    AttributeValueSingleQuote_0, // ("<name ") "'"
+    AttributeValueSingleQuote,   // ("<name ") "'"
     SpecialTagStart,// "<!"
     CommentStart_2, // "<!-"
-    InsideComment,  // "<!--"
+    CommentStart_3, // "<!--"
+    InsideComment,  // "<!--", "<!--text"
     CommentEnd_0,   // "<!-- -"
     CommentEnd_1,   // "<!-- --"
 }
@@ -84,7 +88,7 @@ pub struct XmlTokenizer {
         // these aliases make calls to put_token() look shorter
         const a1 = &output_tokens;
         const a2 = &output_count;
-        const a3 = tokenizer.need_continuation;
+        const a3 = &tokenizer.need_continuation;
         while (tokenizer.cursor - tokenizer.src_buf_offset < tokenizer.src_buf.len) {
             const c = tokenizer.src_buf[tokenizer.cursor - tokenizer.src_buf_offset];
             switch (tokenizer.mode) {
@@ -108,7 +112,7 @@ pub struct XmlTokenizer {
                         '<' => {
                             // done
                             tokenizer.mode = Mode.None;
-                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // not done
@@ -120,7 +124,7 @@ pub struct XmlTokenizer {
                     // we have a "<"
                     switch (c) {
                         '/' => {
-                            tokenizer.mode = Mode.EndTagName;
+                            tokenizer.mode = Mode.EndTagStart_1;
                             tokenizer.token_type = TokenType.EndTagStart;
                             tokenizer.cursor += 1;
                         },
@@ -140,7 +144,7 @@ pub struct XmlTokenizer {
                         ' ', '\t', '\n', '\r', '/', '>' => {
                             // done
                             tokenizer.mode = Mode.InsideStartTag;
-                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // not done
@@ -157,7 +161,7 @@ pub struct XmlTokenizer {
                         '>' => {
                             tokenizer.mode = Mode.None;
                             defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, TokenType.StartTagEnd, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, a3, TokenType.StartTagEnd, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                         '/' => {
                             tokenizer.mode = Mode.TagSelfClose_0;
@@ -165,16 +169,16 @@ pub struct XmlTokenizer {
                         },
                         '=' => {
                             defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, TokenType.AttributeEquals, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, a3, TokenType.AttributeEquals, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                         '"' => {
-                            tokenizer.mode = Mode.AttributeValueDoubleQuote;
+                            tokenizer.mode = Mode.AttributeValueDoubleQuote_0;
                             tokenizer.token_start = tokenizer.cursor;
                             tokenizer.token_type = TokenType.AttributeValue;
                             tokenizer.cursor += 1;
                         },
                         '\'' => {
-                            tokenizer.mode = Mode.AttributeValueSingleQuote;
+                            tokenizer.mode = Mode.AttributeValueSingleQuote_0;
                             tokenizer.token_start = tokenizer.cursor;
                             tokenizer.token_type = TokenType.AttributeValue;
                             tokenizer.cursor += 1;
@@ -191,21 +195,25 @@ pub struct XmlTokenizer {
                         '>' => {
                             tokenizer.mode = Mode.None;
                             defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, TokenType.TagSelfClose, tokenizer.cursor - 1, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, a3, TokenType.TagSelfClose, tokenizer.cursor - 1, tokenizer.cursor + 1)) goto done;
                         },
                         else => {
                             // invalid '/'
                             tokenizer.mode = Mode.InsideStartTag;
-                            if (put_token(a1, a2, TokenType.Invalid, tokenizer.cursor - 1, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.cursor - 1, tokenizer.cursor)) goto done;
                         },
                     }
+                },
+                EndTagStart_1 => {
+                    // this makes sure we don't publish a 0-length partial token before we see any characters of the text content
+                    tokenizer.mode = Mode.EndTagName;
                 },
                 EndTagName => {
                     switch (c) {
                         ' ', '\t', '\n', '\r', '>' => {
                             // done
                             tokenizer.mode = Mode.InsideEndTag;
-                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // not done
@@ -219,7 +227,7 @@ pub struct XmlTokenizer {
                             // done
                             tokenizer.mode = Mode.None;
                             defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, TokenType.EndTagEnd, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, a3, TokenType.EndTagEnd, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                         ' ', '\t', '\n', '\r' => {
                             // skip
@@ -228,7 +236,7 @@ pub struct XmlTokenizer {
                         else => {
                             // invalid characters between "</name" and ">"
                             defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, TokenType.Invalid, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                     }
                 },
@@ -237,13 +245,16 @@ pub struct XmlTokenizer {
                         ' ', '\t', '\n', '\r', '=', '/', '>', '"', '\'' => {
                             // done
                             tokenizer.mode = Mode.InsideStartTag;
-                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // not done
                             tokenizer.cursor += 1;
                         },
                     }
+                },
+                AttributeValueDoubleQuote_0 => {
+                    tokenizer.mode = Mode.AttributeValueDoubleQuote;
                 },
                 AttributeValueDoubleQuote => {
                     switch (c) {
@@ -251,7 +262,7 @@ pub struct XmlTokenizer {
                             // done
                             tokenizer.mode = Mode.InsideStartTag;
                             defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
                         },
                         else => {
                             // not done
@@ -259,13 +270,16 @@ pub struct XmlTokenizer {
                         },
                     }
                 },
+                AttributeValueSingleQuote_0 => {
+                    tokenizer.mode = Mode.AttributeValueSingleQuote;
+                },
                 AttributeValueSingleQuote => {
                     switch (c) {
                         '\'' => {
                             // done
                             tokenizer.mode = Mode.InsideStartTag;
                             defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
                         },
                         else => {
                             // not done
@@ -291,15 +305,18 @@ pub struct XmlTokenizer {
                 CommentStart_2 => {
                     switch (c) {
                         '-' => {
-                            tokenizer.mode = Mode.InsideComment;
+                            tokenizer.mode = Mode.CommentStart_3;
                             tokenizer.cursor += 1;
                         },
                         else => {
                             // "<!-x"
                             tokenizer.mode = Mode.None;
-                            if (put_token(a1, a2, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                     }
+                },
+                CommentStart_3 => {
+                    tokenizer.mode = Mode.InsideComment;
                 },
                 InsideComment => {
                     switch (c) {
@@ -329,7 +346,7 @@ pub struct XmlTokenizer {
                         '>' => {
                             tokenizer.mode = Mode.None;
                             defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
                         },
                         else => {
                             // technically an error, but we tolerate it.
@@ -345,11 +362,10 @@ pub struct XmlTokenizer {
             // flush any partial content spanning chunk boundaries
             if (mode_has_text_content(tokenizer.mode)) {
                 // publish what we got so far
-                put_unfinished_token(a1, a2, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor);
-                tokenizer.need_continuation = true;
+                put_unfinished_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor);
+                tokenizer.token_start = tokenizer.cursor;
             } else {
                 // no partial tokens for these
-                tokenizer.need_continuation = false;
             }
         } else {
             // the is the end
@@ -360,7 +376,7 @@ pub struct XmlTokenizer {
                 Text => {
                     // flush the last text
                     tokenizer.mode = Mode.None;
-                    if (put_token(a1, a2, TokenType.Text, tokenizer.token_start, tokenizer.cursor)) goto done;
+                    if (put_token(a1, a2, a3, TokenType.Text, tokenizer.token_start, tokenizer.cursor)) goto done;
                 },
                 else => {
                     // TODO: report early EOF
@@ -411,13 +427,17 @@ pub struct XmlTokenizer {
         return len;
     }
 }
-fn put_unfinished_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize) {
-    put_exact_token(output_tokens, output_count, token_type, start, end, unfinished_flag);
+fn put_unfinished_token(output_tokens: &[]XmlToken, output_count: &isize, need_continuation: &bool, token_type: TokenType, start: isize, end: isize) {
+    put_exact_token(output_tokens, output_count, need_continuation, token_type, start, end, true);
 }
-fn put_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize) -> bool {
-    return put_exact_token(output_tokens, output_count, token_type, start, end, 0);
+fn put_token(output_tokens: &[]XmlToken, output_count: &isize, need_continuation: &bool, token_type: TokenType, start: isize, end: isize) -> bool {
+    return put_exact_token(output_tokens, output_count, need_continuation, token_type, start, end, false);
 }
-fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, token_type: TokenType, start: isize, end: isize, flags: u8) -> bool {
+fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, need_continuation: &bool, token_type: TokenType, start: isize, end: isize, is_unfinished: bool) -> bool {
+    const flags =
+        (if (is_unfinished) unfinished_flag else 0) |
+        (if (*need_continuation) continuation_flag else 0);
+    *need_continuation = is_unfinished;
     (*output_tokens)[*output_count] = XmlToken{
         .token_type = token_type,
         .flags = flags,
@@ -429,8 +449,9 @@ fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, token_type:
 }
 fn mode_has_text_content(mode: Mode) -> bool {
     return switch (mode) {
-        None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
-        SpecialTagStart, CommentStart_2, CommentEnd_0, CommentEnd_1 => false,
+        None, TagStart, InsideStartTag, TagSelfClose_0, EndTagStart_1, InsideEndTag,
+        SpecialTagStart, CommentStart_2, CommentStart_3, CommentEnd_0, CommentEnd_1,
+        AttributeValueDoubleQuote_0, AttributeValueSingleQuote_0 => false,
 
         Text, StartTagName, EndTagName, AttributeName, InsideComment,
         AttributeValueDoubleQuote, AttributeValueSingleQuote => true,
@@ -617,6 +638,7 @@ fn test_chopped_input(source: []const u8, expected_tokens: []?ExpectedToken) {
                 const true_start = scratch_token.start;
                 scratch_token = output_token;
                 scratch_token.start = true_start;
+                scratch_token.flags &= ~continuation_flag;
             } else {
                 assert(!output_token.is_continuation());
                 scratch_token = output_token;
