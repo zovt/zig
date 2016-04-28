@@ -343,11 +343,13 @@ pub struct XmlTokenizer {
         // the input buffer has been exhausted
         if (!tokenizer.is_eof) {
             // flush any partial content spanning chunk boundaries
-            if (mode_has_text_content(tokenizer.mode)) {
-                if (tokenizer.token_start != tokenizer.cursor) {
+            const trailing_uncertainty = get_unfinished_token_trailing_uncertainty(tokenizer.mode);
+            if (trailing_uncertainty != -1) {
+                const token_end = tokenizer.cursor - trailing_uncertainty;
+                if (tokenizer.token_start != token_end) {
                     // publish what we got so far
-                    put_unfinished_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor);
-                    tokenizer.token_start = tokenizer.cursor;
+                    put_unfinished_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, token_end);
+                    tokenizer.token_start = token_end;
                 }
             } else {
                 // no partial tokens for these
@@ -412,8 +414,8 @@ pub struct XmlTokenizer {
         while (local_start < 0 && len > 0; {local_start += 1; len -= 1}) {
             // backfill the output buffer with whatever character was leading us to believe
             // it was going to terminate this token, but really didn't.
-            const tease_char = switch (token.token_type) {
-                Comment => u8('-'),
+            const tease_char: u8 = switch (token.token_type) {
+                Comment => '-',
                 // TODO: Cdata => ']',
                 else => unreachable{},
             };
@@ -448,13 +450,18 @@ fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, need_contin
     *output_count += 1;
     return *output_count >= output_tokens.len;
 }
-fn mode_has_text_content(mode: Mode) -> bool {
+fn get_unfinished_token_trailing_uncertainty(mode: Mode) -> isize {
     return switch (mode) {
         None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
-        SpecialTagStart, CommentStart_2, CommentEnd_0, CommentEnd_1 => false,
+        SpecialTagStart, CommentStart_2 => -1,
 
         Text, StartTagName, EndTagName, AttributeName, InsideComment,
-        AttributeValueDoubleQuote, AttributeValueSingleQuote => true,
+        AttributeValueDoubleQuote, AttributeValueSingleQuote => 0,
+
+        CommentEnd_0 => 1,
+        CommentEnd_1 => 2,
+        // TODO: CdataEnd_0, => 1,
+        // TODO: CdataEnd_1, => 2,
     }
 }
 
@@ -597,9 +604,6 @@ fn test_every_which_way(source: []const u8, expected_tokens: []const ?ExpectedTo
     {
         var cut_offset: isize = 0;
         while (cut_offset < source.len + 1; cut_offset += 1) {
-            // TODO: this is the bug
-            //cut_offset = 14;
-            //@breakpoint();
             var sources_array = [][]const u8{
                 source[0...cut_offset],
                 source[cut_offset...],
