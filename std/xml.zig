@@ -1,6 +1,12 @@
 const assert = @import("std").assert;
 const str_eql = @import("std").str.eql;
 
+#debug_safety(false)
+fn copy_slice(T: type)(dest: []T, src: []const T) {
+    assert(dest.len == src.len);
+    @memcpy(&dest[0], &src[0], src.len)
+}
+
 pub enum TokenType {
     Invalid,
     Text,            // "text outside tags"
@@ -37,18 +43,14 @@ enum Mode {
     StartTagName,   // "<n", "<name"
     InsideStartTag, // "<name "
     TagSelfClose_0, // ("<name ") "/"
-    EndTagStart_1,  // "</"
     EndTagName,     // "</", "</name"
     InsideEndTag,   // "</name "
     AttributeName,  // ("<name ") "a"
-    AttributeValueDoubleQuote_0, // ("<name ") '"'
-    AttributeValueDoubleQuote,   // ("<name ") '"'
-    AttributeValueSingleQuote_0, // ("<name ") "'"
-    AttributeValueSingleQuote,   // ("<name ") "'"
+    AttributeValueDoubleQuote, // ("<name ") '"'
+    AttributeValueSingleQuote, // ("<name ") "'"
     SpecialTagStart,// "<!"
     CommentStart_2, // "<!-"
-    CommentStart_3, // "<!--"
-    InsideComment,  // "<!--", "<!--text"
+    InsideComment,  // "<!--"
     CommentEnd_0,   // "<!-- -"
     CommentEnd_1,   // "<!-- --"
 }
@@ -124,7 +126,7 @@ pub struct XmlTokenizer {
                     // we have a "<"
                     switch (c) {
                         '/' => {
-                            tokenizer.mode = Mode.EndTagStart_1;
+                            tokenizer.mode = Mode.EndTagName;
                             tokenizer.token_type = TokenType.EndTagStart;
                             tokenizer.cursor += 1;
                         },
@@ -172,13 +174,13 @@ pub struct XmlTokenizer {
                             if (put_token(a1, a2, a3, TokenType.AttributeEquals, tokenizer.cursor, tokenizer.cursor + 1)) goto done;
                         },
                         '"' => {
-                            tokenizer.mode = Mode.AttributeValueDoubleQuote_0;
+                            tokenizer.mode = Mode.AttributeValueDoubleQuote;
                             tokenizer.token_start = tokenizer.cursor;
                             tokenizer.token_type = TokenType.AttributeValue;
                             tokenizer.cursor += 1;
                         },
                         '\'' => {
-                            tokenizer.mode = Mode.AttributeValueSingleQuote_0;
+                            tokenizer.mode = Mode.AttributeValueSingleQuote;
                             tokenizer.token_start = tokenizer.cursor;
                             tokenizer.token_type = TokenType.AttributeValue;
                             tokenizer.cursor += 1;
@@ -203,10 +205,6 @@ pub struct XmlTokenizer {
                             if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.cursor - 1, tokenizer.cursor)) goto done;
                         },
                     }
-                },
-                EndTagStart_1 => {
-                    // this makes sure we don't publish a 0-length partial token before we see any characters of the text content
-                    tokenizer.mode = Mode.EndTagName;
                 },
                 EndTagName => {
                     switch (c) {
@@ -253,9 +251,6 @@ pub struct XmlTokenizer {
                         },
                     }
                 },
-                AttributeValueDoubleQuote_0 => {
-                    tokenizer.mode = Mode.AttributeValueDoubleQuote;
-                },
                 AttributeValueDoubleQuote => {
                     switch (c) {
                         '"' => {
@@ -269,9 +264,6 @@ pub struct XmlTokenizer {
                             tokenizer.cursor += 1;
                         },
                     }
-                },
-                AttributeValueSingleQuote_0 => {
-                    tokenizer.mode = Mode.AttributeValueSingleQuote;
                 },
                 AttributeValueSingleQuote => {
                     switch (c) {
@@ -305,7 +297,7 @@ pub struct XmlTokenizer {
                 CommentStart_2 => {
                     switch (c) {
                         '-' => {
-                            tokenizer.mode = Mode.CommentStart_3;
+                            tokenizer.mode = Mode.InsideComment;
                             tokenizer.cursor += 1;
                         },
                         else => {
@@ -314,9 +306,6 @@ pub struct XmlTokenizer {
                             if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                     }
-                },
-                CommentStart_3 => {
-                    tokenizer.mode = Mode.InsideComment;
                 },
                 InsideComment => {
                     switch (c) {
@@ -423,7 +412,7 @@ pub struct XmlTokenizer {
         const local_end = token.end - skip_end - tokenizer.src_buf_offset;
         const len = local_end - local_start;
         assert(output_buf.len >= len);
-        @memcpy(&output_buf[0], &tokenizer.src_buf[local_start], len);
+        copy_slice(u8)(output_buf[0...len], tokenizer.src_buf[local_start...local_start + len]);
         return len;
     }
 }
@@ -449,9 +438,8 @@ fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, need_contin
 }
 fn mode_has_text_content(mode: Mode) -> bool {
     return switch (mode) {
-        None, TagStart, InsideStartTag, TagSelfClose_0, EndTagStart_1, InsideEndTag,
-        SpecialTagStart, CommentStart_2, CommentStart_3, CommentEnd_0, CommentEnd_1,
-        AttributeValueDoubleQuote_0, AttributeValueSingleQuote_0 => false,
+        None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
+        SpecialTagStart, CommentStart_2, CommentEnd_0, CommentEnd_1 => false,
 
         Text, StartTagName, EndTagName, AttributeName, InsideComment,
         AttributeValueDoubleQuote, AttributeValueSingleQuote => true,
