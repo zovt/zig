@@ -12,6 +12,7 @@ pub enum TokenType {
     AttributeName,   // ("<name ") "name"
     AttributeEquals, // ("<name ") "="
     AttributeValue,  // ("<name ") "'value'", '"value"'
+    Cdata,           // "<![CDATA[text]]>"
     Comment,         // "<!--text-->"
 }
 pub const unfinished_flag: u8 = 1;
@@ -42,11 +43,23 @@ enum Mode {
     AttributeName,  // ("<name ") "a"
     AttributeValueDoubleQuote, // ("<name ") '"'
     AttributeValueSingleQuote, // ("<name ") "'"
-    SpecialTagStart,// "<!"
-    CommentStart_2, // "<!-"
-    InsideComment,  // "<!--"
-    CommentEnd_0,   // "<!-- -"
-    CommentEnd_1,   // "<!-- --"
+    SectionStart,            // "<!"
+    ConditionalSectionStart, // "<!["
+    // TODO: InsideConditionalSection,// "<![ "
+    // TODO: ConditionalSectionEnd_0, // "<![ ]"
+    // TODO: ConditionalSectionEnd_1, // "<![ ]]"
+    CdataStart_3,            // "<![C"
+    CdataStart_4,            // "<![CD"
+    CdataStart_5,            // "<![CDA"
+    CdataStart_6,            // "<![CDAT"
+    CdataStart_7,            // "<![CDATA"
+    InsideCdata,             // "<![CDATA["
+    CdataEnd_0,              // "<![CDATA[ ]"
+    CdataEnd_1,              // "<![CDATA[ ]]"
+    CommentStart_2,          // "<!-"
+    InsideComment,           // "<!--"
+    CommentEnd_0,            // "<!-- -"
+    CommentEnd_1,            // "<!-- --"
 }
 pub struct XmlTokenizer {
     src_buf: []const u8,
@@ -125,7 +138,7 @@ pub struct XmlTokenizer {
                             tokenizer.cursor += 1;
                         },
                         '!' => {
-                            tokenizer.mode = Mode.SpecialTagStart;
+                            tokenizer.mode = Mode.SectionStart;
                             tokenizer.cursor += 1;
                         },
                         // TODO: '?'
@@ -273,7 +286,7 @@ pub struct XmlTokenizer {
                         },
                     }
                 },
-                SpecialTagStart => {
+                SectionStart => {
                     // we have "<!"
                     switch (c) {
                         '-' => {
@@ -281,10 +294,126 @@ pub struct XmlTokenizer {
                             tokenizer.token_type = TokenType.Comment;
                             tokenizer.cursor += 1;
                         },
-                        // TODO: '['
+                        '[' => {
+                            tokenizer.mode = Mode.ConditionalSectionStart;
+                            tokenizer.cursor += 1;
+                        },
                         else => {
                             // TODO: dtd stuff
                             unreachable{};
+                        },
+                    }
+                },
+                ConditionalSectionStart => {
+                    switch (c) {
+                        'C' => {
+                            tokenizer.mode = Mode.CdataStart_3;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            // TODO: tokenizer.mode = Mode.InsideConditionalSection;
+                            unreachable{};
+                        },
+                    }
+                },
+                CdataStart_3 => {
+                    switch (c) {
+                        'D' => {
+                            tokenizer.mode = Mode.CdataStart_4;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.mode = Mode.None;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
+                        },
+                    }
+                },
+                CdataStart_4 => {
+                    switch (c) {
+                        'A' => {
+                            tokenizer.mode = Mode.CdataStart_5;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.mode = Mode.None;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
+                        },
+                    }
+                },
+                CdataStart_5 => {
+                    switch (c) {
+                        'T' => {
+                            tokenizer.mode = Mode.CdataStart_6;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.mode = Mode.None;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
+                        },
+                    }
+                },
+                CdataStart_6 => {
+                    switch (c) {
+                        'A' => {
+                            tokenizer.mode = Mode.CdataStart_7;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.mode = Mode.None;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
+                        },
+                    }
+                },
+                CdataStart_7 => {
+                    switch (c) {
+                        '[' => {
+                            tokenizer.mode = Mode.InsideCdata;
+                            tokenizer.token_type = TokenType.Cdata;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.mode = Mode.None;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
+                        },
+                    }
+                },
+                InsideCdata => {
+                    switch (c) {
+                        ']' => {
+                            tokenizer.mode = Mode.CdataEnd_0;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.cursor += 1;
+                        },
+                    }
+                },
+                CdataEnd_0 => {
+                    switch (c) {
+                        ']' => {
+                            tokenizer.mode = Mode.CdataEnd_1;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.mode = Mode.InsideCdata;
+                            tokenizer.cursor += 1;
+                        },
+                    }
+                },
+                CdataEnd_1 => {
+                    switch (c) {
+                        '>' => {
+                            tokenizer.mode = Mode.None;
+                            tokenizer.cursor += 1;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
+                        },
+                        ']' => {
+                            // keep hoping
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.mode = Mode.InsideCdata;
+                            tokenizer.cursor += 1;
                         },
                     }
                 },
@@ -395,6 +524,10 @@ pub struct XmlTokenizer {
             EndTagStart => {
                 skip_start = 2;
             },
+            Cdata => {
+                skip_start = 9;
+                skip_end = 3;
+            },
             Comment => {
                 skip_start = 4;
                 skip_end = 3;
@@ -416,7 +549,7 @@ pub struct XmlTokenizer {
             // it was going to terminate this token, but really didn't.
             const tease_char: u8 = switch (token.token_type) {
                 Comment => '-',
-                // TODO: Cdata => ']',
+                Cdata => ']',
                 else => unreachable{},
             };
             assert(output_buf.len >= output_cursor + 1);
@@ -453,15 +586,20 @@ fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, need_contin
 fn get_unfinished_token_trailing_uncertainty(mode: Mode) -> isize {
     return switch (mode) {
         None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
-        SpecialTagStart, CommentStart_2 => -1,
+        SectionStart, ConditionalSectionStart, CommentStart_2,
+        CdataStart_3,
+        CdataStart_4,
+        CdataStart_5,
+        CdataStart_6,
+        CdataStart_7 => -1,
 
-        Text, StartTagName, EndTagName, AttributeName, InsideComment,
+        Text, StartTagName, EndTagName, AttributeName, InsideCdata, InsideComment,
         AttributeValueDoubleQuote, AttributeValueSingleQuote => 0,
 
         CommentEnd_0 => 1,
         CommentEnd_1 => 2,
-        // TODO: CdataEnd_0, => 1,
-        // TODO: CdataEnd_1, => 2,
+        CdataEnd_0 => 1,
+        CdataEnd_1 => 2,
     }
 }
 
@@ -525,12 +663,19 @@ fn xml_simple_comment_test() {
 }
 
 #attribute("test")
-fn xml_tricky_comment_test() {
-    // this is technically forbidden by the spec, but we should be able to handle it anyway.
-    // TODO: test this with <![CDATA[]]]]]]> instead.
-    const source = "<!------->";
+fn xml_cdata_test() {
+    const source = "<![CDATA[a<b>c]]>";
     const expected_tokens = []?ExpectedToken{
-        make_token(TokenType.Comment, 0, source.len, "---"),
+        make_token(TokenType.Cdata, 0, source.len, "a<b>c"),
+    };
+    test_every_which_way(source, expected_tokens);
+}
+
+#attribute("test")
+fn xml_tricky_tokenizer_test() {
+    const source = "<![CDATA[]]]]]]>";
+    const expected_tokens = []?ExpectedToken{
+        make_token(TokenType.Cdata, 0, source.len, "]]]]"),
     };
     test_every_which_way(source, expected_tokens);
 }
