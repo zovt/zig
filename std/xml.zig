@@ -44,10 +44,7 @@ enum Mode {
     AttributeValueDoubleQuote, // ("<name ") '"'
     AttributeValueSingleQuote, // ("<name ") "'"
     SectionStart,            // "<!"
-    ConditionalSectionStart, // "<!["
-    // TODO: InsideConditionalSection,// "<![ "
-    // TODO: ConditionalSectionEnd_0, // "<![ ]"
-    // TODO: ConditionalSectionEnd_1, // "<![ ]]"
+    CdataStart_2,            // "<!["
     CdataStart_3,            // "<![C"
     CdataStart_4,            // "<![CD"
     CdataStart_5,            // "<![CDA"
@@ -295,7 +292,7 @@ pub struct XmlTokenizer {
                             tokenizer.cursor += 1;
                         },
                         '[' => {
-                            tokenizer.mode = Mode.ConditionalSectionStart;
+                            tokenizer.mode = Mode.CdataStart_2;
                             tokenizer.cursor += 1;
                         },
                         else => {
@@ -304,15 +301,15 @@ pub struct XmlTokenizer {
                         },
                     }
                 },
-                ConditionalSectionStart => {
+                CdataStart_2 => {
                     switch (c) {
                         'C' => {
                             tokenizer.mode = Mode.CdataStart_3;
                             tokenizer.cursor += 1;
                         },
                         else => {
-                            // TODO: tokenizer.mode = Mode.InsideConditionalSection;
-                            unreachable{};
+                            tokenizer.mode = Mode.None;
+                            if (put_token(a1, a2, a3, TokenType.Invalid, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                     }
                 },
@@ -586,7 +583,8 @@ fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, need_contin
 fn get_unfinished_token_trailing_uncertainty(mode: Mode) -> isize {
     return switch (mode) {
         None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
-        SectionStart, ConditionalSectionStart, CommentStart_2,
+        SectionStart, CommentStart_2,
+        CdataStart_2,
         CdataStart_3,
         CdataStart_4,
         CdataStart_5,
