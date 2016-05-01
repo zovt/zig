@@ -3,17 +3,18 @@ const str_eql = @import("std").str.eql;
 
 pub enum TokenType {
     Invalid,
-    Text,            // "text outside tags"
-    StartTagStart,   // "<name"
-    StartTagEnd,     // ("<name") ">"
-    TagSelfClose,    // ("<name") "/>"
-    EndTagStart,     // "</name"
-    EndTagEnd,       // ("</name") ">"
-    AttributeName,   // ("<name ") "name"
-    AttributeEquals, // ("<name ") "="
-    AttributeValue,  // ("<name ") "'value'", '"value"'
-    Cdata,           // "<![CDATA[text]]>"
-    Comment,         // "<!--text-->"
+    Text,                  // "text outside tags"
+    StartTagStart,         // "<name"
+    StartTagEnd,           // ("<name") ">"
+    TagSelfClose,          // ("<name") "/>"
+    EndTagStart,           // "</name"
+    EndTagEnd,             // ("</name") ">"
+    AttributeName,         // ("<name ") "name"
+    AttributeEquals,       // ("<name ") "="
+    AttributeValue,        // ("<name ") "'value'", '"value"'
+    ProcessingInstruction, // '<%xml version="1.0">'
+    Cdata,                 // "<![CDATA[text]]>"
+    Comment,               // "<!--text-->"
 }
 pub const unfinished_flag: u8 = 1;
 pub const continuation_flag: u8 = 2;
@@ -43,20 +44,22 @@ enum Mode {
     AttributeName,  // ("<name ") "a"
     AttributeValueDoubleQuote, // ("<name ") '"'
     AttributeValueSingleQuote, // ("<name ") "'"
-    SectionStart,            // "<!"
-    CdataStart_2,            // "<!["
-    CdataStart_3,            // "<![C"
-    CdataStart_4,            // "<![CD"
-    CdataStart_5,            // "<![CDA"
-    CdataStart_6,            // "<![CDAT"
-    CdataStart_7,            // "<![CDATA"
-    InsideCdata,             // "<![CDATA["
-    CdataEnd_0,              // "<![CDATA[ ]"
-    CdataEnd_1,              // "<![CDATA[ ]]"
-    CommentStart_2,          // "<!-"
-    InsideComment,           // "<!--"
-    CommentEnd_0,            // "<!-- -"
-    CommentEnd_1,            // "<!-- --"
+    InsideProcessingInstruction, // "<%", "<%xml version="
+    ProcessingInstructionEnd_0,  // "<% %"
+    SectionStart,   // "<!"
+    CdataStart_2,   // "<!["
+    CdataStart_3,   // "<![C"
+    CdataStart_4,   // "<![CD"
+    CdataStart_5,   // "<![CDA"
+    CdataStart_6,   // "<![CDAT"
+    CdataStart_7,   // "<![CDATA"
+    InsideCdata,    // "<![CDATA["
+    CdataEnd_0,     // "<![CDATA[ ]"
+    CdataEnd_1,     // "<![CDATA[ ]]"
+    CommentStart_2, // "<!-"
+    InsideComment,  // "<!--"
+    CommentEnd_0,   // "<!-- -"
+    CommentEnd_1,   // "<!-- --"
 }
 pub struct XmlTokenizer {
     src_buf: []const u8,
@@ -138,7 +141,11 @@ pub struct XmlTokenizer {
                             tokenizer.mode = Mode.SectionStart;
                             tokenizer.cursor += 1;
                         },
-                        // TODO: '?'
+                        '?' => {
+                            tokenizer.mode = Mode.InsideProcessingInstruction;
+                            tokenizer.token_type = TokenType.ProcessingInstruction;
+                            tokenizer.cursor += 1;
+                        },
                         else => {
                             tokenizer.mode = Mode.StartTagName;
                             tokenizer.token_type = TokenType.StartTagStart;
@@ -279,6 +286,36 @@ pub struct XmlTokenizer {
                         },
                         else => {
                             // not done
+                            tokenizer.cursor += 1;
+                        },
+                    }
+                },
+                InsideProcessingInstruction => {
+                    switch (c) {
+                        '?' => {
+                            tokenizer.mode = Mode.ProcessingInstructionEnd_0;
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            tokenizer.cursor += 1;
+                        },
+                    }
+                },
+                ProcessingInstructionEnd_0 => {
+                    switch (c) {
+                        '>' => {
+                            // done
+                            tokenizer.mode = Mode.None;
+                            tokenizer.cursor += 1;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
+                        },
+                        '?' => {
+                            // keep hoping
+                            tokenizer.cursor += 1;
+                        },
+                        else => {
+                            // false alarm
+                            tokenizer.mode = Mode.InsideProcessingInstruction;
                             tokenizer.cursor += 1;
                         },
                     }
@@ -521,6 +558,10 @@ pub struct XmlTokenizer {
             EndTagStart => {
                 skip_start = 2;
             },
+            ProcessingInstruction => {
+                skip_start = 2;
+                skip_end = 2;
+            },
             Cdata => {
                 skip_start = 9;
                 skip_end = 3;
@@ -547,6 +588,7 @@ pub struct XmlTokenizer {
             const tease_char: u8 = switch (token.token_type) {
                 Comment => '-',
                 Cdata => ']',
+                ProcessingInstruction => '?',
                 else => unreachable{},
             };
             assert(output_buf.len >= output_cursor + 1);
@@ -582,6 +624,7 @@ fn put_exact_token(output_tokens: &[]XmlToken, output_count: &isize, need_contin
 }
 fn get_unfinished_token_trailing_uncertainty(mode: Mode) -> isize {
     return switch (mode) {
+        // no text content to publish
         None, TagStart, InsideStartTag, TagSelfClose_0, InsideEndTag,
         SectionStart, CommentStart_2,
         CdataStart_2,
@@ -591,9 +634,12 @@ fn get_unfinished_token_trailing_uncertainty(mode: Mode) -> isize {
         CdataStart_6,
         CdataStart_7 => -1,
 
+        // publish right up to the cursor
         Text, StartTagName, EndTagName, AttributeName, InsideCdata, InsideComment,
-        AttributeValueDoubleQuote, AttributeValueSingleQuote => 0,
+        InsideProcessingInstruction, AttributeValueDoubleQuote, AttributeValueSingleQuote => 0,
 
+        // hesitate on the last characters, because it might be the start of the terminator
+        ProcessingInstructionEnd_0 => 1,
         CommentEnd_0 => 1,
         CommentEnd_1 => 2,
         CdataEnd_0 => 1,
@@ -682,7 +728,7 @@ fn xml_tricky_tokenizer_test() {
 fn xml_processing_instruction_test() {
     const s1 = "xml version=\"1.0\"";
     const s2 = "name";
-    const s3 = "actually-fine \"";
+    const s3 = "actually-fine ?\"?";
     const source =
         "<?" ++ s1 ++ "?>" ++
         "<?" ++ s2 ++ "?>" ++
