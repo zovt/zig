@@ -680,12 +680,34 @@ fn xml_tricky_tokenizer_test() {
     test_every_which_way(source, expected_tokens);
 }
 
+#attribute("test")
+fn xml_processing_instruction_test() {
+    const s1 = "xml version=\"1.0\"";
+    const s2 = "name";
+    const s3 = "actually-fine \"";
+    const source =
+        "<?" ++ s1 ++ "?>" ++
+        "<?" ++ s2 ++ "?>" ++
+        "<?" ++ s3 ++ "?>";
+    var cursor: isize = 0;
+    const t1 = make_token(TokenType.ProcessingInstruction, cursor, {cursor += s1.len + 4; cursor}, s1);
+    const t2 = make_token(TokenType.ProcessingInstruction, cursor, {cursor += s2.len + 4; cursor}, s2);
+    const t3 = make_token(TokenType.ProcessingInstruction, cursor, {cursor += s3.len + 4; cursor}, s3);
+    const expected_tokens = []?ExpectedToken{t1, t2, t3};
+    test_every_which_way(source, expected_tokens);
+}
+
 //TODO: #attribute("test")
 fn xml_complex_test() {
     const source = r"XML(
 <?xml version="1.0"?>
 <?processing-instruction?>
-<!-- TODO: internal dtd craziness -->
+<!DOCTYPE an-internal-dtd [
+  <!-- comment inside internal DTD ]> -->
+  <%dont-look-here ]>%>
+  <!ENTITY % not-this ']>'>
+  <!ENTITY or-this "]>">
+] >
 <root>
   <group name="Group 1" type="Normal">
     <Prime frame="1" alive="true"/>
@@ -695,8 +717,8 @@ fn xml_complex_test() {
   </group>
   <group name="Group 2" type="Crazy">
     <a-:_2. quot='"' apos="'"
-        elements="&amp;&lt;&gt;&apos;&quot;"/>
         characters="&#9;, &#x10FFFF;, &#1114111;"
+        elements="&amp;&lt;&gt;&apos;&quot;"/>
     <![CDATA[<literal text="in">a &quot;<![CDATA[>/literal>]]>
     <!--
       comment <contains> &apos; </stuff>
