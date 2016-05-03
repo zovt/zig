@@ -12,7 +12,8 @@ pub enum TokenType {
     AttributeName,         // ("<name ") "name"
     AttributeEquals,       // ("<name ") "="
     AttributeValue,        // ("<name ") "'value'", '"value"'
-    ProcessingInstruction, // '<%xml version="1.0">'
+    ProcessingInstruction, // '<?xml version="1.0"?>'
+    Doctype,               // "<!DOCTYPE ...>"
     Cdata,                 // "<![CDATA[text]]>"
     Comment,               // "<!--text-->"
 }
@@ -44,8 +45,8 @@ enum Mode {
     AttributeName,  // ("<name ") "a"
     AttributeValueDoubleQuote, // ("<name ") '"'
     AttributeValueSingleQuote, // ("<name ") "'"
-    InsideProcessingInstruction, // "<%", "<%xml version="
-    ProcessingInstructionEnd_0,  // "<% %"
+    InsideProcessingInstruction, // "<?", "<?xml version="
+    ProcessingInstructionEnd_0,  // "<? ?"
     SectionStart,   // "<!"
     CdataStart_2,   // "<!["
     CdataStart_3,   // "<![C"
@@ -60,6 +61,20 @@ enum Mode {
     InsideComment,  // "<!--"
     CommentEnd_0,   // "<!-- -"
     CommentEnd_1,   // "<!-- --"
+    InsideDoctype,                          // "<!D", "<!DOCTYPE ..."
+    InsideDoctypeDoubleQuote,               // '<!DOCTYPE "'
+    InsideDoctypeSingleQuote,               // "<!DOCTYPE '"
+    InsideInternalDtd,                      // "<!DOCTYPE ["
+    InternalDtdTagStart,                    // "<!DOCTYPE [ <"
+    InsideInternalDtdProcessingInstruction, // "<!DOCTYPE [ <?"
+    InternalDtdProcessingInstructionEnd_0,  // "<!DOCTYPE [ <? ?"
+    InternalDtdCommentStart_0,              // "<!DOCTYPE [ <!"
+    InternalDtdCommentStart_1,              // "<!DOCTYPE [ <!-"
+    InsideInternalDtdComment,               // "<!DOCTYPE [ <!--"
+    InternalDtdCommentEnd_0,                // "<!DOCTYPE [ <!-- -"
+    InternalDtdCommentEnd_1,                // "<!DOCTYPE [ <!-- --"
+    InsideInternalDtdDoubleQuote,           // '<!DOCTYPE [ "'
+    InsideInternalDtdSingleQuote,           // "<!DOCTYPE [ '"
 }
 pub struct XmlTokenizer {
     src_buf: []const u8,
@@ -333,8 +348,8 @@ pub struct XmlTokenizer {
                             tokenizer.cursor += 1;
                         },
                         else => {
-                            // TODO: dtd stuff
-                            unreachable{};
+                            tokenizer.mode = Mode.InsideDoctype;
+                            tokenizer.token_type = TokenType.Doctype;
                         },
                     }
                 },
@@ -491,13 +506,121 @@ pub struct XmlTokenizer {
                     switch (c) {
                         '>' => {
                             tokenizer.mode = Mode.None;
-                            defer tokenizer.cursor += 1;
-                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor + 1)) goto done;
+                            tokenizer.cursor += 1;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
                         },
                         else => {
                             // technically an error, but we tolerate it.
                             tokenizer.cursor += 1;
                         },
+                    }
+                },
+
+                InsideDoctype => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '>'  => {
+                            tokenizer.mode = Mode.None;
+                            if (put_token(a1, a2, a3, tokenizer.token_type, tokenizer.token_start, tokenizer.cursor)) goto done;
+                        },
+                        '"'  => { tokenizer.mode = Mode.InsideDoctypeDoubleQuote; },
+                        '\'' => { tokenizer.mode = Mode.InsideDoctypeSingleQuote; },
+                        '['  => { tokenizer.mode = Mode.InsideInternalDtd; },
+                        else => {},
+                    }
+                },
+                InsideDoctypeDoubleQuote => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '"'  => { tokenizer.mode = Mode.InsideDoctype; },
+                        else => {},
+                    }
+                },
+                InsideDoctypeSingleQuote => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '\''  => { tokenizer.mode = Mode.InsideDoctype; },
+                        else => {},
+                    }
+                },
+                InsideInternalDtd => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        ']'  => { tokenizer.mode = Mode.InsideDoctype; },
+                        '<'  => { tokenizer.mode = Mode.InternalDtdTagStart; },
+                        '"'  => { tokenizer.mode = Mode.InsideInternalDtdDoubleQuote; },
+                        '\'' => { tokenizer.mode = Mode.InsideInternalDtdSingleQuote; },
+                        else => {},
+                    }
+                },
+                InternalDtdTagStart => {
+                    switch (c) {
+                        '?'  => { tokenizer.mode = Mode.InsideInternalDtdProcessingInstruction; tokenizer.cursor += 1; },
+                        '!'  => { tokenizer.mode = Mode.InternalDtdCommentStart_0;              tokenizer.cursor += 1; },
+                        else => { tokenizer.mode = Mode.InsideInternalDtd; },
+                    }
+                },
+                InsideInternalDtdProcessingInstruction => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '?'  => { tokenizer.mode = Mode.InternalDtdProcessingInstructionEnd_0; },
+                        else => {},
+                    }
+                },
+                InternalDtdProcessingInstructionEnd_0 => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '>'  => { tokenizer.mode = Mode.InsideInternalDtd; },
+                        '?'  => {},
+                        else => { tokenizer.mode = Mode.InsideInternalDtdProcessingInstruction; },
+                    }
+                },
+                InternalDtdCommentStart_0 => {
+                    switch (c) {
+                        '-'  => { tokenizer.mode = Mode.InternalDtdCommentStart_1; tokenizer.cursor += 1; },
+                        else => { tokenizer.mode = Mode.InsideInternalDtd; },
+                    }
+                },
+                InternalDtdCommentStart_1 => {
+                    switch (c) {
+                        '-'  => { tokenizer.mode = Mode.InsideInternalDtdComment; tokenizer.cursor += 1; },
+                        else => { tokenizer.mode = Mode.InsideInternalDtd; },
+                    }
+                },
+                InsideInternalDtdComment => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '-'  => { tokenizer.mode = Mode.InternalDtdCommentEnd_0; },
+                        else => {},
+                    }
+                },
+                InternalDtdCommentEnd_0 => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '-'  => { tokenizer.mode = Mode.InternalDtdCommentEnd_1; },
+                        else => { tokenizer.mode = Mode.InsideInternalDtdComment; },
+                    }
+                },
+                InternalDtdCommentEnd_1 => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '>'  => { tokenizer.mode = Mode.InsideInternalDtd; },
+                        '-'  => {},
+                        else => { tokenizer.mode = Mode.InsideInternalDtdComment; },
+                    }
+                },
+                InsideInternalDtdDoubleQuote => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '"'  => { tokenizer.mode = Mode.InsideInternalDtd; },
+                        else => {},
+                    }
+                },
+                InsideInternalDtdSingleQuote => {
+                    tokenizer.cursor += 1;
+                    switch (c) {
+                        '\''  => { tokenizer.mode = Mode.InsideInternalDtd; },
+                        else => {},
                     }
                 },
             }
@@ -570,6 +693,10 @@ pub struct XmlTokenizer {
                 skip_start = 4;
                 skip_end = 3;
             },
+            Doctype => {
+                skip_start = 2;
+                skip_end = 1;
+            },
         };
         if (token.is_continuation()) {
             skip_start = 0;
@@ -636,7 +763,21 @@ fn get_unfinished_token_trailing_uncertainty(mode: Mode) -> isize {
 
         // publish right up to the cursor
         Text, StartTagName, EndTagName, AttributeName, InsideCdata, InsideComment,
-        InsideProcessingInstruction, AttributeValueDoubleQuote, AttributeValueSingleQuote => 0,
+        InsideProcessingInstruction, AttributeValueDoubleQuote, AttributeValueSingleQuote,
+        InsideDoctype,
+        InsideDoctypeDoubleQuote,
+        InsideDoctypeSingleQuote,
+        InsideInternalDtd,
+        InternalDtdTagStart,
+        InsideInternalDtdProcessingInstruction,
+        InternalDtdProcessingInstructionEnd_0,
+        InternalDtdCommentStart_0,
+        InternalDtdCommentStart_1,
+        InsideInternalDtdComment,
+        InternalDtdCommentEnd_0,
+        InternalDtdCommentEnd_1,
+        InsideInternalDtdDoubleQuote,
+        InsideInternalDtdSingleQuote => 0,
 
         // hesitate on the last characters, because it might be the start of the terminator
         ProcessingInstructionEnd_0 => 1,
@@ -644,6 +785,7 @@ fn get_unfinished_token_trailing_uncertainty(mode: Mode) -> isize {
         CommentEnd_1 => 2,
         CdataEnd_0 => 1,
         CdataEnd_1 => 2,
+
     }
 }
 
@@ -741,6 +883,23 @@ fn xml_processing_instruction_test() {
     test_every_which_way(source, expected_tokens);
 }
 
+#attribute("test")
+fn xml_doctype_test() {
+    const s1 = "<!DOCTYPE note SYSTEM \"Note.dtd\">";
+    const s2 = r"XML(<!DOCTYPE an-internal-dtd [
+  <!-- comment inside internal DTD ]> -->
+  <?dont-look-here ]>?>
+  <!ENTITY % not-this ']>'>
+  <!ENTITY or-this "]>">
+] >)XML";
+    const source = s1 ++ s2;
+    const expected_tokens = []?ExpectedToken{
+        make_token(TokenType.Doctype, 0, s1.len, s1[2...s1.len - 1]),
+        make_token(TokenType.Doctype, s1.len, s1.len + s2.len, s2[2...s2.len - 1]),
+    };
+    test_every_which_way(source, expected_tokens);
+}
+
 //TODO: #attribute("test")
 fn xml_complex_test() {
     const source = r"XML(
@@ -748,7 +907,7 @@ fn xml_complex_test() {
 <?processing-instruction?>
 <!DOCTYPE an-internal-dtd [
   <!-- comment inside internal DTD ]> -->
-  <%dont-look-here ]>%>
+  <?dont-look-here ]>?>
   <!ENTITY % not-this ']>'>
   <!ENTITY or-this "]>">
 ] >
