@@ -345,3 +345,71 @@ pub const SYS_userfaultfd  = 388;
 pub const SYS_membarrier   = 389;
 pub const SYS_mlock2   = 390;
 pub const SYS_copy_file_range  = 391;
+
+pub fn syscall0(number: isize) -> isize {
+    asm volatile ("svc 0"
+        : [ret] "={r0}" (-> isize)
+        : [number] "{r7}" (number))
+}
+
+pub fn syscall1(number: isize, arg1: isize) -> isize {
+    asm volatile ("svc 0"
+        : [ret] "={r0}" (-> isize)
+        : [number] "{r7}" (number),
+            [arg1] "{r0}" (arg1))
+}
+
+pub fn syscall2(number: isize, arg1: isize, arg2: isize) -> isize {
+    asm volatile ("svc 0"
+        : [ret] "={r0}" (-> isize)
+        : [number] "{r7}" (number),
+            [arg1] "{r0}" (arg1),
+            [arg2] "{r1}" (arg2))
+}
+
+pub fn syscall3(number: isize, arg1: isize, arg2: isize, arg3: isize) -> isize {
+    asm volatile ("svc 0"
+        : [ret] "={r0}" (-> isize)
+        : [number] "{r7}" (number),
+            [arg1] "{r0}" (arg1),
+            [arg2] "{r1}" (arg2),
+            [arg3] "{r2}" (arg3))
+}
+
+pub fn syscall4(number: isize, arg1: isize, arg2: isize, arg3: isize, arg4: isize) -> isize {
+    asm volatile ("svc 0"
+        : [ret] "={r0}" (-> isize)
+        : [number] "{r7}" (number),
+            [arg1] "{r0}" (arg1),
+            [arg2] "{r1}" (arg2),
+            [arg3] "{r2}" (arg3),
+            [arg4] "{r3}" (arg4))
+}
+
+pub fn syscall5(number: isize, arg1: isize, arg2: isize, arg3: isize,
+    arg4: isize, arg5: isize) -> isize
+{
+    asm volatile ("svc 0"
+        : [ret] "={r0}" (-> isize)
+        : [number] "{r7}" (number),
+            [arg1] "{r0}" (arg1),
+            [arg2] "{r1}" (arg2),
+            [arg3] "{r2}" (arg3),
+            [arg4] "{r3}" (arg4),
+            [arg5] "{r4}" (arg5))
+}
+
+pub fn syscall6(number: isize, arg1: isize, arg2: isize, arg3: isize,
+    arg4: isize, arg5: isize, arg6: isize) -> isize
+{
+    asm volatile ("svc 0"
+        : [ret] "={r0}" (-> isize)
+        : [number] "{r7}" (number),
+            [arg1] "{r0}" (arg1),
+            [arg2] "{r1}" (arg2),
+            [arg3] "{r2}" (arg3),
+            [arg4] "{r3}" (arg4),
+            [arg5] "{r4}" (arg5),
+            [arg6] "{r5}" (arg6))
+}
+

@@ -25,6 +25,10 @@ export fn _start() -> unreachable {
             argc = asm("mov (%%esp), %[argc]": [argc] "=r" (-> isize));
             argv = asm("lea 0x4(%%esp), %[argv]": [argv] "=r" (-> &&u8));
         },
+        armv7 => {
+          // TODO: Implement setting argc and argv.
+          // Reference: musl/arch/arm/crt_arch.h and musl/ldso/dlstart.c
+        },
         else => @compile_err("unsupported arch"),
     }
     call_main_and_exit()
