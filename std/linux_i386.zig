@@ -2,6 +2,10 @@ const linux = @import("linux.zig");
 const socklen_t = linux.socklen_t;
 const iovec = linux.iovec;
 
+// TODO: Replace "hack_true" with "true" when issue 154 is resolved.
+const hack_true = @compile_var("is_release") || !@compile_var("is_release");
+pub const use_mmap2 = hack_true;
+
 pub const SYS_restart_syscall = 0;
 pub const SYS_exit = 1;
 pub const SYS_fork = 2;

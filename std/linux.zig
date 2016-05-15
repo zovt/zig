@@ -227,7 +227,11 @@ pub fn get_errno(r: isize) -> isize {
 }
 
 pub fn mmap(address: ?&u8, length: isize, prot: isize, flags: isize, fd: isize, offset: isize) -> isize {
-    arch.syscall6(arch.SYS_mmap, isize(address), length, prot, flags, fd, offset)
+    if (arch.use_mmap2) {
+        arch.syscall6(arch.SYS_mmap2, isize(address), length, prot, flags, fd, offset / 4096)
+    } else {
+        arch.syscall6(arch.SYS_mmap, isize(address), length, prot, flags, fd, offset)
+    }
 }
 
 pub fn munmap(address: &u8, length: isize) -> isize {

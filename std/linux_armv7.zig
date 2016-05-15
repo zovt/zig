@@ -1,3 +1,11 @@
+const linux = @import("linux.zig");
+const socklen_t = linux.socklen_t;
+const iovec = linux.iovec;
+
+// TODO: Replace "hack_true" with "true" when issue 154 is resolved.
+const hack_true = @compile_var("is_release") || !@compile_var("is_release");
+pub const use_mmap2 = hack_true;
+
 pub const SYS_restart_syscall  = 0;
 pub const SYS_exit  = 1;
 pub const SYS_fork  = 2;
@@ -456,3 +464,12 @@ pub fn syscall6(number: isize, arg1: isize, arg2: isize, arg3: isize,
             [arg6] "{r5}" (arg6))
 }
 
+export struct msghdr {
+    msg_name: &u8,
+    msg_namelen: socklen_t,
+    msg_iov: &iovec,
+    msg_iovlen: i32,
+    msg_control: &u8,
+    msg_controllen: socklen_t,
+    msg_flags: i32,
+}
