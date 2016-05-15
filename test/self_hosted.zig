@@ -361,12 +361,7 @@ fn enum_type() {
     assert(bar == EnumTypeBar.B);
     assert(@member_count(EnumTypeFoo) == 3);
     assert(@member_count(EnumTypeBar) == 4);
-    const expected_foo_size = switch (@compile_var("arch")) {
-        i386 => 20,
-        x86_64 => 24,
-        else => unreachable{},
-    };
-    assert(@sizeof(EnumTypeFoo) == expected_foo_size);
+    assert(@sizeof(EnumTypeFoo) >= 16);
     assert(@sizeof(EnumTypeBar) == 1);
 }
 struct EnumType {

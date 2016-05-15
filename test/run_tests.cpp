@@ -1866,7 +1866,7 @@ static void run_test(TestCase *test_case) {
         os_exec_process(tmp_exe_path, test_case->program_args, &term, &program_stderr, &program_stdout);
 
         if (test_case->is_debug_safety) {
-            int debug_trap_signal = 5;
+            int debug_trap_signal = 4;
             if (term.how != TerminationIdSignaled || term.code != debug_trap_signal) {
                 if (term.how == TerminationIdClean) {
                     printf("\nProgram expected to hit debug trap (signal %d) but exited with return code %d\n",
