@@ -1,5 +1,5 @@
-const assert = @import("std").assert;
-const str_eql = @import("std").str.eql;
+const assert = @import("debug.zig").assert;
+const str_eql = @import("str.zig").eql;
 
 pub enum TokenType {
     Invalid,
