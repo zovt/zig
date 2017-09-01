@@ -1,17 +1,32 @@
-const std = @import("std");
-const mem = std.mem;
-const math = std.math;
-const assert = std.debug.assert;
+// Much of this library is adapted from [yauzl](https://github.com/thejoshwolfe/yauzl)
+const mem = @import("std").mem;
+const math = @import("std").math;
+const assert = @import("std").debug.assert;
 
 error NotAZipFile;
 error MultiDiskArchivesNotSupported;
+error InvalidZipFileCommentLength;
 
-const eocdr_len = 22;
+const eocdr_fixed_size = 22;
 pub fn fromBuffer(buffer: []const u8) -> %ZipFile {
-    if (buffer.len < eocdr_len) return error.NotAZipFile;
-    const eocdr_buffer = buffer[buffer.len - eocdr_len ..];
-    // TODO: search backward to skip any zipfile comment
-    if (readInt32(eocdr_buffer, 0) != 0x06054b50) return error.NotAZipFile;
+    if (buffer.len < eocdr_fixed_size) return error.NotAZipFile;
+
+    // search backward to skip any zipfile comment
+    const max_possible_comment_length = 0xffff;
+    const max_possible_eocdr_length = eocdr_fixed_size + max_possible_comment_length;
+    const earliest_possible_eocdr_start =
+        if  (buffer.len < max_possible_eocdr_length) 0
+        else buffer.len - max_possible_eocdr_length;
+    const eocdr_search_buffer = buffer[earliest_possible_eocdr_start..];
+    var comment_length: u64 = 0;
+    var eocdr_buffer: []const u8 = undefined;
+    while (true) : (comment_length += 1) {
+        const search_position = eocdr_search_buffer.len - comment_length - eocdr_fixed_size;
+        eocdr_buffer = eocdr_search_buffer[search_position .. search_position + eocdr_fixed_size];
+        if (readInt32(eocdr_buffer, 0) == 0x06054b50) break;
+        if (comment_length == max_possible_comment_length) return error.NotAZipFile;
+    }
+    // found it
 
     // 0 - End of central directory signature = 0x06054b50
     // 4 - Number of this disk
@@ -24,9 +39,10 @@ pub fn fromBuffer(buffer: []const u8) -> %ZipFile {
     // 16 - Offset of start of central directory, relative to start of archive
     const central_directory_offset = readInt32(eocdr_buffer, 16);
     // 20 - Comment length
-    // TODO: worry about comment length
+    const reported_comment_length = readInt16(eocdr_buffer, 20);
     // 22 - Comment
-    // (the encoding is always cp437.)
+
+    if (comment_length != reported_comment_length) return error.InvalidZipFileCommentLength;
 
     // TODO: ZIP64 support
 
@@ -35,15 +51,14 @@ pub fn fromBuffer(buffer: []const u8) -> %ZipFile {
         .entry_count = entry_count,
         .central_directory_cursor = central_directory_offset,
         .read_entry_counter = 0,
+        .comment_length = reported_comment_length,
     };
 
     return zipfile;
 }
 
-error EndOfEntries;
 error UnexpectedEof;
 error InvalidCentralDirectoryRecordSignature;
-error FileNameTooLong;
 error InvalidLocalFileHeaderSignature;
 
 const central_directory_record_fixed_size = 46;
@@ -54,9 +69,15 @@ pub const ZipFile = struct {
     entry_count : u32,
     read_entry_counter: u32,
     central_directory_cursor : u64,
+    comment_length : u16,
+
+    pub fn readRawZipFileComment(self: &const ZipFile, output_buffer: []u8) {
+        assert(output_buffer.len >= self.comment_length);
+        mem.copy(u8, output_buffer, self.buffer[self.buffer.len - self.comment_length..]);
+    }
 
     pub fn readEntry(self: &ZipFile) -> %Entry {
-        if (self.read_entry_counter >= self.entry_count) return error.EndOfEntries;
+        assert(self.read_entry_counter < self.entry_count);
         const entry_end = math.add(u64,
             self.central_directory_cursor,
             central_directory_record_fixed_size)
@@ -123,8 +144,8 @@ pub const ZipFile = struct {
         return entry;
     }
 
-    pub fn readEntryFileName(self: &const ZipFile, entry: &const Entry, output_buffer: []u8) -> %void {
-        if (output_buffer.len < entry.file_name_length) return error.FileNameTooLong;
+    pub fn readRawEntryFileName(self: &const ZipFile, entry: &const Entry, output_buffer: []u8) -> %void {
+        assert(output_buffer.len >= entry.file_name_length);
         // We already checked that this was in bounds when we read the entry.
         const file_name_start = entry.central_directory_record_offset + central_directory_record_fixed_size;
         mem.copy(u8, output_buffer, self.buffer[file_name_start .. file_name_start + entry.file_name_length]);
@@ -180,7 +201,7 @@ pub const ZipFile = struct {
     }
 };
 
-const Entry = struct {
+pub const Entry = struct {
     central_directory_record_offset: u64,
     version_made_by: u16,
     version_needed_to_extract: u16,
@@ -231,124 +252,8 @@ fn readInt32(buffer: []const u8, offset: usize) -> u32 {
     mem.readInt(buffer[offset .. offset + 4], u32, false)
 }
 
-test "openRawReadStream" {
-    @setEvalBranchQuota(100000);
-
-    // Thanks to https://github.com/thejoshwolfe/yauzl for this test data.
-    // zipfile obtained via:
-    //  $ echo -n 'aaabaaabaaabaaab' > stored.txt
-    //  $ cp stored.txt compressed.txt
-    //  $ cp stored.txt encrypted.txt
-    //  $ cp stored.txt encrypted-and-compressed.txt
-    //  $ rm -f out.zip
-    //  $ zip out.zip -0 stored.txt
-    //  $ zip out.zip compressed.txt
-    //  $ zip out.zip -e0 encrypted.txt
-    //  $ zip out.zip -e encrypted-and-compressed.txt
-    const zipfile_buffer = comptime hexToBin(
-        "504b03040a00000000006a54954ab413389510000000100000000a001c007374" ++
-        "6f7265642e7478745554090003d842fa5842c5f75875780b000104e803000004" ++
-        "e803000061616162616161626161616261616162504b03041400000008007554" ++
-        "954ab413389508000000100000000e001c00636f6d707265737365642e747874" ++
-        "5554090003ed42fa58ed42fa5875780b000104e803000004e80300004b4c4c4c" ++
-        "4a44c200504b03040a00090000008454954ab41338951c000000100000000d00" ++
-        "1c00656e637279707465642e74787455540900030743fa580743fa5875780b00" ++
-        "0104e803000004e8030000f72e7bb915142131c934f01b163fcadb2a8db7cdaf" ++
-        "d0a6f4dd1694c0504b0708b41338951c00000010000000504b03041400090008" ++
-        "008a54954ab413389514000000100000001c001c00656e637279707465642d61" ++
-        "6e642d636f6d707265737365642e74787455540900031343fa581343fa587578" ++
-        "0b000104e803000004e80300007c4d3ea0d9754b470d3eb32ada5741bfc848f4" ++
-        "19504b0708b41338951400000010000000504b01021e030a00000000006a5495" ++
-        "4ab413389510000000100000000a0018000000000000000000b4810000000073" ++
-        "746f7265642e7478745554050003d842fa5875780b000104e803000004e80300" ++
-        "00504b01021e031400000008007554954ab413389508000000100000000e0018" ++
-        "000000000001000000b48154000000636f6d707265737365642e747874555405" ++
-        "0003ed42fa5875780b000104e803000004e8030000504b01021e030a00090000" ++
-        "008454954ab41338951c000000100000000d0018000000000000000000b481a4" ++
-        "000000656e637279707465642e74787455540500030743fa5875780b000104e8" ++
-        "03000004e8030000504b01021e031400090008008a54954ab413389514000000" ++
-        "100000001c0018000000000001000000b48117010000656e637279707465642d" ++
-        "616e642d636f6d707265737365642e74787455540500031343fa5875780b0001" ++
-        "04e803000004e8030000504b0506000000000400040059010000910100000000" ++
-    "");
-    assert(zipfile_buffer[0] == 0x50);
-    assert(zipfile_buffer[2] == 0x03);
-    const entry_names = []const []const u8{
-        "stored.txt",
-        "compressed.txt",
-        "encrypted.txt",
-        "encrypted-and-compressed.txt",
-    };
-    const entry_is_compressed = []const bool {
-        false,
-        true,
-        false,
-        true,
-    };
-    const entry_is_encrypted = []const bool {
-        false,
-        false,
-        true,
-        true,
-    };
-    const entry_raw_file_data = comptime []const []const u8 {
-        hexToBin("61616162616161626161616261616162"),
-        hexToBin("4b4c4c4c4a44c200"),
-        hexToBin("f72e7bb915142131c934f01b163fcadb2a8db7cdafd0a6f4dd1694c0"),
-        hexToBin("7c4d3ea0d9754b470d3eb32ada5741bfc848f419"),
-    };
-
-    var zipfile = %%fromBuffer(zipfile_buffer);
-    assert(zipfile.entry_count == 4);
-
-    var entries: [4]Entry = undefined;
-    for (entries) |*entry, i| {
-        *entry = %%zipfile.readEntry();
-        testEntryName(zipfile, entry, entry_names[i]);
-        testEntryAttributes(entry, entry_is_compressed[i], entry_is_encrypted[i]);
-        testEntryRawFileData(&zipfile, entry, entry_raw_file_data[i]);
-    }
-
-    for ([]void{{}} ** 2) |_| {
-        // TODO: using _ twice shouldn't result in a redeclaration error
-        if (zipfile.readEntry()) |_unused| unreachable
-        else |e| assert(e == error.EndOfEntries);
-    }
-
-    // This should still work after reading to the end
-    for (entries) |*entry, i| {
-        testEntryName(zipfile, entry, entry_names[i]);
-        testEntryAttributes(entry, entry_is_compressed[i], entry_is_encrypted[i]);
-        testEntryRawFileData(&zipfile, entry, entry_raw_file_data[i]);
-    }
-}
-
-fn testEntryName(zipfile: &const ZipFile, entry: &const Entry, expected_name: []const u8) {
-    var name_buffer = []u8{0} ** 0x100;
-    %%zipfile.readEntryFileName(entry, name_buffer[0..entry.file_name_length]);
-    assert(mem.eql(u8, name_buffer[0..entry.file_name_length], expected_name));
-}
-fn testEntryAttributes(entry: &const Entry, expected_compressed: bool, expected_encrypted: bool) {
-    assert(entry.isCompressed() == expected_compressed);
-    assert(entry.isEncrypted() == expected_encrypted);
-}
-fn testEntryRawFileData(zipfile: &ZipFile, entry: &const Entry, expected_contents: []const u8) {
-    for ([]u64{0, 2}) |start| {
-        for ([]u64{3, 5, expected_contents.len}) |end| {
-            var stream = %%zipfile.openRawReadStream(entry, start, end);
-            var buffer = []u8{0} ** 0x100;
-            const expected_read_amount = end - start;
-            assert(stream.read(buffer[0..]) == expected_read_amount);
-            assert(mem.eql(u8, expected_contents[start .. end], buffer[0 .. expected_read_amount]));
-        }
-    }
-}
-
-fn hexToBin(comptime hexString: []const u8) -> [@divExact(hexString.len, 2)]u8 {
-    const finalLen = @divExact(hexString.len, 2);
-    var result: [finalLen]u8 = undefined;
-    {var i = 0; while (i < finalLen) : (i += 1) {
-        result[i] = %%std.fmt.parseUnsigned(u8, hexString[i * 2 .. i * 2 + 2], 16);
-    }}
-    return result;
+test "unzip" {
+    _ = @import("test_empty.zig");
+    _ = @import("test_readRawZipFileComment.zig");
+    _ = @import("test_openRawReadStream.zig");
 }
