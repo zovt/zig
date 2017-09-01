@@ -443,6 +443,7 @@ install(FILES "${CMAKE_SOURCE_DIR}/std/special/compiler_rt/udivmodti4.zig" DESTI
 install(FILES "${CMAKE_SOURCE_DIR}/std/special/compiler_rt/umodti3.zig" DESTINATION "${ZIG_STD_DEST}/special/compiler_rt")
 install(FILES "${CMAKE_SOURCE_DIR}/std/special/test_runner.zig" DESTINATION "${ZIG_STD_DEST}/special")
 install(FILES "${CMAKE_SOURCE_DIR}/std/special/zigrt.zig" DESTINATION "${ZIG_STD_DEST}/special")
+install(FILES "${CMAKE_SOURCE_DIR}/std/unzip/index.zig" DESTINATION "${ZIG_STD_DEST}/unzip")
 
 if (ZIG_TEST_COVERAGE)
     add_custom_target(coverage
