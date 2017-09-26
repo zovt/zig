@@ -9,6 +9,8 @@ comptime {
     _ = @import("fixunstfdi.zig");
     _ = @import("fixunstfsi.zig");
     _ = @import("fixunstfti.zig");
+    _ = @import("trunctfdf2.zig");
+    _ = @import("trunctfsf2.zig");
     _ = @import("udivmoddi4.zig");
     _ = @import("udivmodti4.zig");
     _ = @import("udivti3.zig");

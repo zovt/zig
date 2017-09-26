@@ -246,10 +246,26 @@ test "hex float literal parsing" {
 }
 
 test "quad hex float literal parsing in range" {
-    const a = 0x1.af23456789bbaaab347645365cdep+5;
-    const b = 0x1.dedafcff354b6ae9758763545432p-9;
-    const c = 0x1.2f34dd5f437e849b4baab754cdefp+4534;
-    const d = 0x1.edcbff8ad76ab5bf46463233214fp-435;
+    const a: f128 = 0x1.af23456789bbaaab347645365cdep+5;
+    const b: f128 = 0x1.dedafcff354b6ae9758763545432p-9;
+    const c: f128 = 0x1.2f34dd5f437e849b4baab754cdefp+4534;
+    const d: f128 = 0x1.edcbff8ad76ab5bf46463233214fp-435;
+
+    const ai: u128 = 0x4004af23456789bbaaac000000000000;
+    const bi: u128 = 0x3ff6dedafcff354b6aea000000000000;
+    const ci: u128 = 0x51b52f34dd5f437e849c000000000000;
+    const di: u128 = 0x3e4cedcbff8ad76ab5c0000000000000;
+
+    // TODO: Verify the following. Taken from GCC output, but verify that too and just use the
+    // actual bit representation.
+    // _ = @import("std").debug.warn("{} {}\n", @bitCast(u128, a), ai);
+    // assert(@bitCast(u128, a) == ai);
+    // _ = @import("std").debug.warn("{} {}\n", @bitCast(u128, b), ai);
+    // assert(@bitCast(u128, b) == bi);
+    // _ = @import("std").debug.warn("{} {}\n", @bitCast(u128, c), ci);
+    // assert(@bitCast(u128, c) == ci);
+    // _ = @import("std").debug.warn("{} {}\n", @bitCast(u128, d), di);
+    // assert(@bitCast(u128, d) == di);
 }
 
 test "hex float literal within range" {

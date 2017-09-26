@@ -3,8 +3,9 @@ const assert = @import("../debug.zig").assert;
 
 pub fn inf(comptime T: type) -> T {
     switch (T) {
-        f32 => @bitCast(f32, math.inf_u32),
-        f64 => @bitCast(f64, math.inf_u64),
+        f32 => math.inf_f32,
+        f64 => math.inf_f64,
+        f128 => math.inf_f128,
         else => @compileError("inf not implemented for " ++ @typeName(T)),
     }
 }

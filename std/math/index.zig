@@ -20,17 +20,21 @@ pub const f32_toint = 1.0 / f32_epsilon;
 
 pub const nan_u32 = u32(0x7F800001);
 pub const nan_f32 = @bitCast(f32, nan_u32);
-
 pub const inf_u32 = u32(0x7F800000);
 pub const inf_f32 = @bitCast(f32, inf_u32);
 
 pub const nan_u64 = u64(0x7FF << 52) | 1;
 pub const nan_f64 = @bitCast(f64, nan_u64);
-
 pub const inf_u64 = u64(0x7FF << 52);
 pub const inf_f64 = @bitCast(f64, inf_u64);
 
+pub const nan_u128 = u128(0x7FFF << 112) | 1;
+pub const nan_f128 = @bitCast(f128, nan_u128);
+pub const inf_u128 = u128(0x7FFF << 112);
+pub const inf_f128 = @bitCast(f128, nan_f128);
+
 pub const nan = @import("nan.zig").nan;
+pub const nanRepr = @import("nan.zig").nanRepr;
 pub const snan = @import("nan.zig").snan;
 pub const inf = @import("inf.zig").inf;
 

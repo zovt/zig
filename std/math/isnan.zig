@@ -12,6 +12,10 @@ pub fn isNan(x: var) -> bool {
             const bits = @bitCast(u64, x);
             (bits & (@maxValue(u64) >> 1)) > (u64(0x7FF) << 52)
         },
+        f128 => {
+            const bits = @bitCast(u128, x);
+            (bits & (@maxValue(u128) >> 1)) > (u128(0x7FFF) << 112)
+        },
         else => {
             @compileError("isNan not implemented for " ++ @typeName(T));
         },
@@ -27,6 +31,8 @@ pub fn isSignalNan(x: var) -> bool {
 test "math.isNan" {
     assert(isNan(math.nan(f32)));
     assert(isNan(math.nan(f64)));
+    //assert(isNan(math.nan(f128)));
     assert(!isNan(f32(1.0)));
     assert(!isNan(f64(1.0)));
+    assert(!isNan(f128(1.0)));
 }
