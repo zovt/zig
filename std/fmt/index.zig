@@ -381,7 +381,7 @@ pub fn parseInt(comptime T: type, buf: []const u8, radix: u8) -> %T {
 test "fmt.parseInt" {
     assert(%%parseInt(i32, "-10", 10) == -10);
     assert(%%parseInt(i32, "+10", 10) == 10);
-    assert(if (parseInt(i32, " 10", 10)) |_| false else |err| err == error.InvalidChar);
+    assert(if (parseInt(i32, " 10", 10)) |_| false else |err| err == error.InvalidCharacter);
 }
 
 pub fn parseUnsigned(comptime T: type, buf: []const u8, radix: u8) -> %T {
@@ -396,17 +396,17 @@ pub fn parseUnsigned(comptime T: type, buf: []const u8, radix: u8) -> %T {
     return x;
 }
 
-error InvalidChar;
+error InvalidCharacter;
 fn charToDigit(c: u8, radix: u8) -> %u8 {
     const value = switch (c) {
         '0' ... '9' => c - '0',
         'A' ... 'Z' => c - 'A' + 10,
         'a' ... 'z' => c - 'a' + 10,
-        else => return error.InvalidChar,
+        else => return error.InvalidCharacter,
     };
 
     if (value >= radix)
-        return error.InvalidChar;
+        return error.InvalidCharacter;
 
     return value;
 }
@@ -471,7 +471,7 @@ fn bufPrintIntToSlice(buf: []u8, value: var, base: u8, uppercase: bool, width: u
 
 test "parse u64 digit too big" {
     _ = parseUnsigned(u64, "123a", 10) %% |err| {
-        if (err == error.InvalidChar) return;
+        if (err == error.InvalidCharacter) return;
         unreachable;
     };
     unreachable;
@@ -504,9 +504,9 @@ test "fmt.format" {
     }
     {
         var buf1: [32]u8 = undefined;
-        const value: %i32 = error.InvalidChar;
+        const value: %i32 = error.InvalidCharacter;
         const result = bufPrint(buf1[0..], "error union: {}\n", value);
-        assert(mem.eql(u8, result, "error union: error.InvalidChar\n"));
+        assert(mem.eql(u8, result, "error union: error.InvalidCharacter\n"));
     }
 }
 

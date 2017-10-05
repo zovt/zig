@@ -11,6 +11,7 @@ error MissingDebugInfo;
 error InvalidDebugInfo;
 error UnsupportedDebugInfo;
 
+// TODO: migrate all tests to use assertOrPanic and then remove this special casing of is_test mode 
 pub fn assert(ok: bool) {
     if (!ok) {
         // In ReleaseFast test mode, we still want assert(false) to crash, so
@@ -20,6 +21,15 @@ pub fn assert(ok: bool) {
         } else {
             unreachable // assertion failure
         }
+    }
+}
+
+// TODO accept var args to pass to @panic,
+// depends on fixing unable to call var args function at compile time
+// then give it an args argument and pass it on to @panic
+pub fn assertOrPanic(ok: bool) {
+    if (!ok) {
+        @panic("assertion failure");
     }
 }
 

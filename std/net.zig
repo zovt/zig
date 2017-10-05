@@ -176,7 +176,7 @@ fn hexDigit(c: u8) -> u8 {
     }
 }
 
-error InvalidChar;
+error InvalidCharacter;
 error Overflow;
 error JunkAtEnd;
 error Incomplete;
@@ -202,11 +202,11 @@ fn parseIp6(buf: []const u8) -> %Address {
                     return error.Overflow;
                 }
             } else {
-                return error.InvalidChar;
+                return error.InvalidCharacter;
             }
         } else if (c == ':') {
             if (!saw_any_digits) {
-                return error.InvalidChar;
+                return error.InvalidCharacter;
             }
             if (index == 14) {
                 return error.JunkAtEnd;
@@ -220,7 +220,7 @@ fn parseIp6(buf: []const u8) -> %Address {
             saw_any_digits = false;
         } else if (c == '%') {
             if (!saw_any_digits) {
-                return error.InvalidChar;
+                return error.InvalidCharacter;
             }
             if (index == 14) {
                 ip_slice[index] = @truncate(u8, x >> 8);
@@ -233,7 +233,7 @@ fn parseIp6(buf: []const u8) -> %Address {
         } else {
             const digit = hexDigit(c);
             if (digit == @maxValue(u8)) {
-                return error.InvalidChar;
+                return error.InvalidCharacter;
             }
             if (@mulWithOverflow(u16, x, 16, &x)) {
                 return error.Overflow;
@@ -287,7 +287,7 @@ fn parseIp4(buf: []const u8) -> %u32 {
     for (buf) |c| {
         if (c == '.') {
             if (!saw_any_digits) {
-                return error.InvalidChar;
+                return error.InvalidCharacter;
             }
             if (index == 3) {
                 return error.JunkAtEnd;
@@ -306,7 +306,7 @@ fn parseIp4(buf: []const u8) -> %u32 {
                 return error.Overflow;
             }
         } else {
-            return error.InvalidChar;
+            return error.InvalidCharacter;
         } 
     }
     if (index == 3 and saw_any_digits) {
@@ -324,10 +324,10 @@ fn parseIp4(buf: []const u8) -> %u32 {
 //
 //    assert(%%parseIp4("127.0.0.1") == endian.swapIfLe(u32, 0x7f000001));
 //    switch (parseIp4("256.0.0.1")) { Overflow => {}, else => unreachable, }
-//    switch (parseIp4("x.0.0.1")) { InvalidChar => {}, else => unreachable, }
+//    switch (parseIp4("x.0.0.1")) { InvalidCharacter => {}, else => unreachable, }
 //    switch (parseIp4("127.0.0.1.1")) { JunkAtEnd => {}, else => unreachable, }
 //    switch (parseIp4("127.0.0.")) { Incomplete => {}, else => unreachable, }
-//    switch (parseIp4("100..0.1")) { InvalidChar => {}, else => unreachable, }
+//    switch (parseIp4("100..0.1")) { InvalidCharacter => {}, else => unreachable, }
 //}
 //
 //fn testParseIp6() {
