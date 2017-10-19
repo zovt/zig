@@ -14,6 +14,10 @@ set(ZIG_VERSION_MINOR 1)
 set(ZIG_VERSION_PATCH 1)
 set(ZIG_VERSION "${ZIG_VERSION_MAJOR}.${ZIG_VERSION_MINOR}.${ZIG_VERSION_PATCH}")
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+    set(FREEBSD ON)
+endif()
+
 find_program(GIT_EXE NAMES git)
 if(GIT_EXE)
     execute_process(
@@ -391,11 +395,21 @@ set_target_properties(zig PROPERTIES
     LINK_FLAGS ${EXE_LDFLAGS}
 )
 
+if(FREEBSD)
+    # libexecinfo is not provided by libc on FreeBSD
+    find_package(execinfo)
+
+    # llvm-config --system-libs adds a bad libexecinfo argument which
+    # is not understood by the the system ld (gnu ld 2.17.50 old!)
+    string(REPLACE ";-l/usr/lib/libexecinfo.so" "" LLVM_LIBRARIES "${LLVM_LIBRARIES}")
+endif()
+
 target_link_libraries(zig LINK_PUBLIC
     ${SOFTFLOAT_LIBRARIES}
     ${CLANG_LIBRARIES}
     ${LLD_LIBRARIES}
     ${LLVM_LIBRARIES}
+    ${EXECINFO_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 if(MSVC OR MINGW)

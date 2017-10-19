@@ -28,6 +28,7 @@ else()
       PATHS
           /usr/lib/llvm/5/include
           /usr/lib/llvm-5.0/include
+          /usr/local/llvm50/include
           /mingw64/include)
 
       macro(FIND_AND_ADD_CLANG_LIB _libname_)
@@ -36,6 +37,7 @@ else()
           PATHS
               /usr/lib/llvm/5/lib
               /usr/lib/llvm-5.0/lib
+              /usr/local/llvm50/lib
               /mingw64/lib
               /c/msys64/mingw64/lib
               c:\\msys64\\mingw64\\lib)
