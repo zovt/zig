@@ -5,9 +5,11 @@ const is_windows = builtin.os == Os.windows;
 pub const windows = @import("windows/index.zig");
 pub const darwin = @import("darwin.zig");
 pub const linux = @import("linux.zig");
+pub const freebsd = @import("freebsd.zig");
 pub const posix = switch(builtin.os) {
     Os.linux => linux,
     Os.darwin, Os.macosx, Os.ios => darwin,
+    Os.freebsd => freebsd,
     else => @compileError("Unsupported OS"),
 };
 
@@ -126,7 +128,7 @@ pub coldcc fn abort() -> noreturn {
         c.abort();
     }
     switch (builtin.os) {
-        Os.linux, Os.darwin, Os.macosx, Os.ios => {
+        Os.linux, Os.darwin, Os.macosx, Os.ios, Os.freebsd => {
             _ = posix.raise(posix.SIGABRT);
             _ = posix.raise(posix.SIGKILL);
             while (true) {}
@@ -147,7 +149,7 @@ pub coldcc fn exit(status: i32) -> noreturn {
         c.exit(status);
     }
     switch (builtin.os) {
-        Os.linux, Os.darwin, Os.macosx, Os.ios => {
+        Os.linux, Os.darwin, Os.macosx, Os.ios, Os.freebsd => {
             posix.exit(status)
         },
         Os.windows => {
@@ -1093,7 +1095,7 @@ pub fn readLink(allocator: &Allocator, pathname: []const u8) -> %[]u8 {
 
 pub fn sleep(seconds: usize, nanoseconds: usize) {
     switch(builtin.os) {
-        Os.linux, Os.darwin, Os.macosx, Os.ios => {
+        Os.linux, Os.darwin, Os.macosx, Os.ios, Os.freebsd => {
             posixSleep(u63(seconds), u63(nanoseconds));
         },
         Os.windows => {

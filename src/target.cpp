@@ -481,6 +481,7 @@ uint32_t target_c_type_size_in_bits(const ZigTarget *target, CIntType id) {
                     zig_unreachable();
             }
         case ZigLLVM_Linux:
+        case ZigLLVM_FreeBSD:
         case ZigLLVM_Darwin:
         case ZigLLVM_MacOSX:
             switch (id) {
@@ -518,7 +519,6 @@ uint32_t target_c_type_size_in_bits(const ZigTarget *target, CIntType id) {
         case ZigLLVM_Ananas:
         case ZigLLVM_CloudABI:
         case ZigLLVM_DragonFly:
-        case ZigLLVM_FreeBSD:
         case ZigLLVM_IOS:
         case ZigLLVM_KFreeBSD:
         case ZigLLVM_Lv2:
