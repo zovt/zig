@@ -2,7 +2,6 @@ const assert = @import("../debug.zig").assert;
 const builtin = @import("builtin");
 const arch = switch (builtin.arch) {
     builtin.Arch.x86_64 => @import("freebsd_x86_64.zig"),
-    builtin.Arch.i386 => @import("freebsd_i386.zig"),
     else => @compileError("unsupported arch"),
 };
 pub use @import("freebsd_errno.zig");

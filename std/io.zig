@@ -501,8 +501,11 @@ pub fn openSelfExe() -> %InStream {
         Os.linux => {
             return InStream.open("/proc/self/exe", null);
         },
-        Os.darwin, Os.freebsd => {
+        Os.darwin => {
             debug.panic("TODO: openSelfExe on Darwin");
+        },
+        Os.freebsd => {
+            debug.panic("TODO: openSelfExe on FreeBSD");
         },
         else => @compileError("Unsupported OS"),
     }

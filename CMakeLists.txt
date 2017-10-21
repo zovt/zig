@@ -596,7 +596,6 @@ install(FILES "${CMAKE_SOURCE_DIR}/std/os/linux_i386.zig" DESTINATION "${ZIG_STD
 install(FILES "${CMAKE_SOURCE_DIR}/std/os/linux_x86_64.zig" DESTINATION "${ZIG_STD_DEST}/os")
 install(FILES "${CMAKE_SOURCE_DIR}/std/os/freebsd.zig" DESTINATION "${ZIG_STD_DEST}/os")
 install(FILES "${CMAKE_SOURCE_DIR}/std/os/freebsd_errno.zig" DESTINATION "${ZIG_STD_DEST}/os")
-install(FILES "${CMAKE_SOURCE_DIR}/std/os/freebsd_i386.zig" DESTINATION "${ZIG_STD_DEST}/os")
 install(FILES "${CMAKE_SOURCE_DIR}/std/os/freebsd_x86_64.zig" DESTINATION "${ZIG_STD_DEST}/os")
 install(FILES "${CMAKE_SOURCE_DIR}/std/os/path.zig" DESTINATION "${ZIG_STD_DEST}/os")
 install(FILES "${CMAKE_SOURCE_DIR}/std/os/windows/error.zig" DESTINATION "${ZIG_STD_DEST}/os/windows")
