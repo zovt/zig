@@ -1,3 +1,4 @@
+const c = @import("../c/index.zig");
 const assert = @import("../debug.zig").assert;
 const builtin = @import("builtin");
 const arch = switch (builtin.arch) {
@@ -26,6 +27,7 @@ pub const MAP_NOSYNC     = 0x0800;
 pub const MAP_ANON       = 0x1000;
 pub const MAP_ANONYMOUS  = MAP_ANON;
 pub const MAP_FILE       = 0;
+pub const MAP_NORESERVE  = 0;
 
 pub const MAP_GUARD      = 0x00002000;
 pub const MAP_EXCL       = 0x00004000;
@@ -368,7 +370,7 @@ pub fn fork() -> usize {
 }
 
 pub fn getcwd(buf: &u8, size: usize) -> usize {
-    arch.syscall2(arch.SYS_getcwd, @ptrToInt(buf), size)
+    arch.syscall2(arch.SYS___getcwd, @ptrToInt(buf), size)
 }
 
 pub fn getdents(fd: i32, dirp: &u8, count: usize) -> usize {
@@ -460,8 +462,8 @@ pub fn exit(status: i32) -> noreturn {
     unreachable
 }
 
-pub fn getrandom(buf: &u8, count: usize, flags: u32) -> usize {
-    arch.syscall3(arch.SYS_getrandom, @ptrToInt(buf), count, usize(flags))
+pub fn arc4rand(buf: &u8, count: usize, reseed: bool) {
+    c.arc4rand(@ptrCast(&c_void, buf), c_uint(count), c_int(reseed));
 }
 
 pub fn kill(pid: i32, sig: i32) -> usize {
@@ -497,32 +499,13 @@ pub fn setregid(rgid: u32, egid: u32) -> usize {
 }
 
 pub fn sigprocmask(flags: u32, noalias set: &const sigset_t, noalias oldset: ?&sigset_t) -> usize {
-    arch.syscall4(arch.SYS_rt_sigprocmask, flags, @ptrToInt(set), @ptrToInt(oldset), NSIG/8)
+    // TODO: Implement
+    0
 }
 
 pub fn sigaction(sig: u6, noalias act: &const Sigaction, noalias oact: ?&Sigaction) -> usize {
-    assert(sig >= 1);
-    assert(sig != SIGKILL);
-    assert(sig != SIGSTOP);
-    var ksa = k_sigaction {
-        .handler = act.handler,
-        .flags = act.flags | SA_RESTORER,
-        .mask = undefined,
-        .restorer = @ptrCast(extern fn(), arch.restore_rt),
-    };
-    var ksa_old: k_sigaction = undefined;
-    @memcpy(@ptrCast(&u8, &ksa.mask), @ptrCast(&const u8, &act.mask), 8);
-    const result = arch.syscall4(arch.SYS_rt_sigaction, sig, @ptrToInt(&ksa), @ptrToInt(&ksa_old), @sizeOf(@typeOf(ksa.mask)));
-    const err = getErrno(result);
-    if (err != 0) {
-        return result;
-    }
-    if (oact) |old| {
-        old.handler = ksa_old.handler;
-        old.flags = @truncate(u32, ksa_old.flags);
-        @memcpy(@ptrCast(&u8, &old.mask), @ptrCast(&const u8, &ksa_old.mask), @sizeOf(@typeOf(ksa_old.mask)));
-    }
-    return 0;
+    // TODO: Implement
+    0
 }
 
 const NSIG = 65;
@@ -530,15 +513,9 @@ const sigset_t = [128 / @sizeOf(usize)]usize;
 const all_mask = []usize{@maxValue(usize)};
 const app_mask = []usize{0xfffffffc7fffffff};
 
-const k_sigaction = extern struct {
-    handler: extern fn(i32),
-    flags: usize,
-    restorer: extern fn(),
-    mask: [2]u32,
-};
-
 /// Renamed from `sigaction` to `Sigaction` to avoid conflict with the syscall.
 pub const Sigaction = struct {
+    // TODO: Adjust to use freebsd struct layout
     handler: extern fn(i32),
     mask: sigset_t,
     flags: u32,

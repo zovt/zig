@@ -94,6 +94,10 @@ pub fn getRandomBytes(buf: []u8) -> %void {
 
             %return posixRead(fd, buf);
         },
+        Os.freebsd => {
+            freebsd.arc4rand(buf.ptr, buf.len, false);
+            return;
+        },
         Os.windows => {
             var hCryptProv: windows.HCRYPTPROV = undefined;
             if (windows.CryptAcquireContextA(&hCryptProv, null, null, windows.PROV_RSA_FULL, 0) == 0) {

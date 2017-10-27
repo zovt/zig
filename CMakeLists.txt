@@ -521,6 +521,7 @@ install(FILES "${CMAKE_SOURCE_DIR}/std/buf_set.zig" DESTINATION "${ZIG_STD_DEST}
 install(FILES "${CMAKE_SOURCE_DIR}/std/buffer.zig" DESTINATION "${ZIG_STD_DEST}")
 install(FILES "${CMAKE_SOURCE_DIR}/std/build.zig" DESTINATION "${ZIG_STD_DEST}")
 install(FILES "${CMAKE_SOURCE_DIR}/std/c/darwin.zig" DESTINATION "${ZIG_STD_DEST}/c")
+install(FILES "${CMAKE_SOURCE_DIR}/std/c/freebsd.zig" DESTINATION "${ZIG_STD_DEST}/c")
 install(FILES "${CMAKE_SOURCE_DIR}/std/c/index.zig" DESTINATION "${ZIG_STD_DEST}/c")
 install(FILES "${CMAKE_SOURCE_DIR}/std/c/linux.zig" DESTINATION "${ZIG_STD_DEST}/c")
 install(FILES "${CMAKE_SOURCE_DIR}/std/c/windows.zig" DESTINATION "${ZIG_STD_DEST}/c")
