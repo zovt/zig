@@ -9,7 +9,7 @@ var argc_ptr: &usize = undefined;
 
 comptime {
     const strong_linkage = builtin.GlobalLinkage.Strong;
-    if (builtin.link_libc) {
+    if (builtin.link_libc or builtin.os == builtin.Os.freebsd) {
         @export("main", main, strong_linkage);
     } else if (builtin.os == builtin.Os.zen) {
         @export("main", zenMain, strong_linkage);

@@ -99,102 +99,96 @@ pub const File = struct {
     }
 
     pub fn seekForward(self: &File, amount: isize) !void {
-        switch (builtin.os) {
-            Os.linux, Os.macosx, Os.ios => {
-                const result = posix.lseek(self.handle, amount, posix.SEEK_CUR);
-                const err = posix.getErrno(result);
-                if (err > 0) {
-                    return switch (err) {
-                        posix.EBADF => error.BadFd,
-                        posix.EINVAL => error.Unseekable,
-                        posix.EOVERFLOW => error.Unseekable,
-                        posix.ESPIPE => error.Unseekable,
-                        posix.ENXIO => error.Unseekable,
-                        else => os.unexpectedErrorPosix(err),
-                    };
-                }
-            },
-            Os.windows => {
-                if (windows.SetFilePointerEx(self.handle, amount, null, windows.FILE_CURRENT) == 0) {
-                    const err = windows.GetLastError();
-                    return switch (err) {
-                        windows.ERROR.INVALID_PARAMETER => error.BadFd,
-                        else => os.unexpectedErrorWindows(err),
-                    };
-                }
-            },
-            else => @compileError("unsupported OS"),
+        if (is_posix) {
+            const result = posix.lseek(self.handle, amount, posix.SEEK_CUR);
+            const err = posix.getErrno(result);
+            if (err > 0) {
+                return switch (err) {
+                    posix.EBADF => error.BadFd,
+                    posix.EINVAL => error.Unseekable,
+                    posix.EOVERFLOW => error.Unseekable,
+                    posix.ESPIPE => error.Unseekable,
+                    posix.ENXIO => error.Unseekable,
+                    else => os.unexpectedErrorPosix(err),
+                };
+            }
+        } else if (is_windows) {
+            if (windows.SetFilePointerEx(self.handle, amount, null, windows.FILE_CURRENT) == 0) {
+                const err = windows.GetLastError();
+                return switch (err) {
+                    windows.ERROR.INVALID_PARAMETER => error.BadFd,
+                    else => os.unexpectedErrorWindows(err),
+                };
+            }
+        } else {
+            @compileError("unsupported OS");
         }
     }
 
     pub fn seekTo(self: &File, pos: usize) !void {
-        switch (builtin.os) {
-            Os.linux, Os.macosx, Os.ios => {
-                const ipos = try math.cast(isize, pos);
-                const result = posix.lseek(self.handle, ipos, posix.SEEK_SET);
-                const err = posix.getErrno(result);
-                if (err > 0) {
-                    return switch (err) {
-                        posix.EBADF => error.BadFd,
-                        posix.EINVAL => error.Unseekable,
-                        posix.EOVERFLOW => error.Unseekable,
-                        posix.ESPIPE => error.Unseekable,
-                        posix.ENXIO => error.Unseekable,
-                        else => os.unexpectedErrorPosix(err),
-                    };
-                }
-            },
-            Os.windows => {
-                const ipos = try math.cast(isize, pos);
-                if (windows.SetFilePointerEx(self.handle, ipos, null, windows.FILE_BEGIN) == 0) {
-                    const err = windows.GetLastError();
-                    return switch (err) {
-                        windows.ERROR.INVALID_PARAMETER => error.BadFd,
-                        else => os.unexpectedErrorWindows(err),
-                    };
-                }
-            },
-            else => @compileError("unsupported OS: " ++ @tagName(builtin.os)),
+        if (is_posix) {
+            const ipos = try math.cast(isize, pos);
+            const result = posix.lseek(self.handle, ipos, posix.SEEK_SET);
+            const err = posix.getErrno(result);
+            if (err > 0) {
+                return switch (err) {
+                    posix.EBADF => error.BadFd,
+                    posix.EINVAL => error.Unseekable,
+                    posix.EOVERFLOW => error.Unseekable,
+                    posix.ESPIPE => error.Unseekable,
+                    posix.ENXIO => error.Unseekable,
+                    else => os.unexpectedErrorPosix(err),
+                };
+            }
+        } else if (is_windows) {
+            const ipos = try math.cast(isize, pos);
+            if (windows.SetFilePointerEx(self.handle, ipos, null, windows.FILE_BEGIN) == 0) {
+                const err = windows.GetLastError();
+                return switch (err) {
+                    windows.ERROR.INVALID_PARAMETER => error.BadFd,
+                    else => os.unexpectedErrorWindows(err),
+                };
+            }
+        } else {
+            @compileError("unsupported OS: " ++ @tagName(builtin.os));
         }
     }
 
     pub fn getPos(self: &File) !usize {
-        switch (builtin.os) {
-            Os.linux, Os.macosx, Os.ios => {
-                const result = posix.lseek(self.handle, 0, posix.SEEK_CUR);
-                const err = posix.getErrno(result);
-                if (err > 0) {
-                    return switch (err) {
-                        posix.EBADF => error.BadFd,
-                        posix.EINVAL => error.Unseekable,
-                        posix.EOVERFLOW => error.Unseekable,
-                        posix.ESPIPE => error.Unseekable,
-                        posix.ENXIO => error.Unseekable,
-                        else => os.unexpectedErrorPosix(err),
-                    };
-                }
-                return result;
-            },
-            Os.windows => {
-                var pos : windows.LARGE_INTEGER = undefined;
-                if (windows.SetFilePointerEx(self.handle, 0, &pos, windows.FILE_CURRENT) == 0) {
-                    const err = windows.GetLastError();
-                    return switch (err) {
-                        windows.ERROR.INVALID_PARAMETER => error.BadFd,
-                        else => os.unexpectedErrorWindows(err),
-                    };
-                }
+        if (is_posix) {
+            const result = posix.lseek(self.handle, 0, posix.SEEK_CUR);
+            const err = posix.getErrno(result);
+            if (err > 0) {
+                return switch (err) {
+                    posix.EBADF => error.BadFd,
+                    posix.EINVAL => error.Unseekable,
+                    posix.EOVERFLOW => error.Unseekable,
+                    posix.ESPIPE => error.Unseekable,
+                    posix.ENXIO => error.Unseekable,
+                    else => os.unexpectedErrorPosix(err),
+                };
+            }
+            return result;
+        } else if (is_windows) {
+            var pos : windows.LARGE_INTEGER = undefined;
+            if (windows.SetFilePointerEx(self.handle, 0, &pos, windows.FILE_CURRENT) == 0) {
+                const err = windows.GetLastError();
+                return switch (err) {
+                    windows.ERROR.INVALID_PARAMETER => error.BadFd,
+                    else => os.unexpectedErrorWindows(err),
+                };
+            }
 
-                assert(pos >= 0);
-                if (@sizeOf(@typeOf(pos)) > @sizeOf(usize)) {
-                    if (pos > @maxValue(usize)) {
-                        return error.FilePosLargerThanPointerRange;
-                    }
+            assert(pos >= 0);
+            if (@sizeOf(@typeOf(pos)) > @sizeOf(usize)) {
+                if (pos > @maxValue(usize)) {
+                    return error.FilePosLargerThanPointerRange;
                 }
+            }
 
-                return usize(pos);
-            },
-            else => @compileError("unsupported OS"),
+            return usize(pos);
+        } else {
+            @compileError("unsupported OS");
         }
     }
 

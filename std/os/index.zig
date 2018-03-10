@@ -94,15 +94,21 @@ pub fn getRandomBytes(buf: []u8) !void {
             }
             return;
         },
+        Os.freebsd => {
+            // runtime evaluation
+            var s: bool = undefined;
+            s = true;
+            if (s) {
+                // TODO: implement
+            } else {
+                return error.Unreachable;
+            }
+        },
         Os.macosx, Os.ios => {
             const fd = try posixOpenC(c"/dev/urandom", posix.O_RDONLY|posix.O_CLOEXEC, 0);
             defer close(fd);
 
             try posixRead(fd, buf);
-        },
-        Os.freebsd => {
-            freebsd.arc4rand(buf.ptr, buf.len, false);
-            return;
         },
         Os.windows => {
             var hCryptProv: windows.HCRYPTPROV = undefined;
@@ -1717,13 +1723,19 @@ pub fn openSelfExe() !os.File {
             const self_exe_path = try selfExePath(&fixed_allocator.allocator);
             return os.File.openRead(&fixed_allocator.allocator, self_exe_path);
         },
+        Os.freebsd => {
+            var fixed_buffer_mem: [freebsd.PATH_MAX * 2]u8 = undefined;
+            var fixed_allocator = std.heap.FixedBufferAllocator.init(fixed_buffer_mem[0..]);
+            const self_exe_path = try selfExePath(&fixed_allocator.allocator);
+            return os.File.openRead(&fixed_allocator.allocator, self_exe_path);
+        },
         else => @compileError("Unsupported OS"),
     }
 }
 
 test "openSelfExe" {
     switch (builtin.os) {
-        Os.linux, Os.macosx, Os.ios => (try openSelfExe()).close(),
+        Os.linux, Os.freebsd, Os.macosx, Os.ios => (try openSelfExe()).close(),
         else => return,  // Unsupported OS.
     }
 }
@@ -1770,6 +1782,19 @@ pub fn selfExePath(allocator: &mem.Allocator) ![]u8 {
             const ret2 = c._NSGetExecutablePath(bytes.ptr, &u32_len);
             assert(ret2 == 0);
             return bytes;
+        },
+        Os.freebsd => {
+            // evalutate at runtime
+            var s: bool = undefined;
+            s = true;
+            if (s) {
+                var out_path = try Buffer.initSize(allocator, 0xff);
+                errdefer out_path.deinit();
+                try out_path.append("/usr/include/stdlib.h");
+                return out_path.toOwnedSlice();
+            } else {
+                return error.Unreachable;
+            }
         },
         else => @compileError("Unsupported OS"),
     }

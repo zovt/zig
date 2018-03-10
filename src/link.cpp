@@ -149,7 +149,7 @@ static const char *getLDMOption(const ZigTarget *t) {
                 return "elf32_x86_64";
             }
             // Any target elf will use the freebsd osabi if suffixed with "_fbsd".
-            if (t->os == ZigLLVM_FreeBSD) {
+            if (t->os == OsFreeBSD) {
                 return "elf_x86_64_fbsd";
             }
             return "elf_x86_64";
