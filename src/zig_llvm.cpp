@@ -5,15 +5,6 @@
  * See http://opensource.org/licenses/MIT
  */
 
-// This must go before all includes.
-#include "config.h"
-#if defined(ZIG_LLVM_OLD_CXX_ABI)
-#define _GLIBCXX_USE_CXX11_ABI 0
-#endif
-
-
-#include "zig_llvm.hpp"
-
 
 /*
  * The point of this file is to contain all the LLVM C++ API interaction so that:
@@ -21,6 +12,8 @@
  * 2. Provide a C interface to the LLVM functions we need for self-hosting purposes.
  * 3. Prevent C++ from infecting the rest of the project.
  */
+
+#include "zig_llvm.h"
 
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
@@ -39,12 +32,17 @@
 #include <llvm/Support/TargetParser.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/Transforms/Coroutines.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/IPO/AlwaysInliner.h>
 #include <llvm/Transforms/Scalar.h>
 
-#include <lld/Driver/Driver.h>
+#include <lld/Common/Driver.h>
+
+#include <new>
+
+#include <stdlib.h>
 
 using namespace llvm;
 
@@ -57,8 +55,7 @@ void ZigLLVMInitializeLowerIntrinsicsPass(LLVMPassRegistryRef R) {
 }
 
 char *ZigLLVMGetHostCPUName(void) {
-    std::string str = sys::getHostCPUName();
-    return strdup(str.c_str());
+    return strdup((const char *)sys::getHostCPUName().bytes_begin());
 }
 
 char *ZigLLVMGetNativeFeatures(void) {
@@ -70,11 +67,11 @@ char *ZigLLVMGetNativeFeatures(void) {
             features.AddFeature(F.first(), F.second);
     }
 
-    return strdup(features.getString().c_str());
+    return strdup((const char *)StringRef(features.getString()).bytes_begin());
 }
 
 static void addDiscriminatorsPass(const PassManagerBuilder &Builder, legacy::PassManagerBase &PM) {
-  PM.add(createAddDiscriminatorsPass());
+    PM.add(createAddDiscriminatorsPass());
 }
 
 #ifndef NDEBUG
@@ -84,12 +81,12 @@ static const bool assertions_on = false;
 #endif
 
 bool ZigLLVMTargetMachineEmitToFile(LLVMTargetMachineRef targ_machine_ref, LLVMModuleRef module_ref,
-        const char *filename, LLVMCodeGenFileType file_type, char **error_message, bool is_debug)
+        const char *filename, ZigLLVM_EmitOutputType output_type, char **error_message, bool is_debug)
 {
     std::error_code EC;
     raw_fd_ostream dest(filename, EC, sys::fs::F_None);
     if (EC) {
-        *error_message = strdup(EC.message().c_str());
+        *error_message = strdup((const char *)StringRef(EC.message()).bytes_begin());
         return true;
     }
     TargetMachine* target_machine = reinterpret_cast<TargetMachine*>(targ_machine_ref);
@@ -97,7 +94,11 @@ bool ZigLLVMTargetMachineEmitToFile(LLVMTargetMachineRef targ_machine_ref, LLVMM
 
     Module* module = unwrap(module_ref);
 
-    PassManagerBuilder *PMBuilder = new PassManagerBuilder();
+    PassManagerBuilder *PMBuilder = new(std::nothrow) PassManagerBuilder();
+    if (PMBuilder == nullptr) {
+        *error_message = strdup("memory allocation failure");
+        return true;
+    }
     PMBuilder->OptLevel = target_machine->getOptLevel();
     PMBuilder->SizeLevel = 0;
 
@@ -107,7 +108,8 @@ bool ZigLLVMTargetMachineEmitToFile(LLVMTargetMachineRef targ_machine_ref, LLVMM
     PMBuilder->SLPVectorize = !is_debug;
     PMBuilder->LoopVectorize = !is_debug;
     PMBuilder->RerollLoops = !is_debug;
-    PMBuilder->NewGVN = !is_debug;
+    // Leaving NewGVN as default (off) because when on it caused issue #673
+    //PMBuilder->NewGVN = !is_debug;
     PMBuilder->DisableGVNLoadPRE = is_debug;
     PMBuilder->VerifyInput = assertions_on;
     PMBuilder->VerifyOutput = assertions_on;
@@ -128,9 +130,12 @@ bool ZigLLVMTargetMachineEmitToFile(LLVMTargetMachineRef targ_machine_ref, LLVMM
         PMBuilder->Inliner = createFunctionInliningPass(PMBuilder->OptLevel, PMBuilder->SizeLevel, false);
     }
 
+    addCoroutinePassesToExtensionPoints(*PMBuilder);
+
     // Set up the per-function pass manager.
     legacy::FunctionPassManager FPM = legacy::FunctionPassManager(module);
-    FPM.add(new TargetLibraryInfoWrapperPass(tlii));
+    auto tliwp = new(std::nothrow) TargetLibraryInfoWrapperPass(tlii);
+    FPM.add(tliwp);
     FPM.add(createTargetTransformInfoWrapperPass(target_machine->getTargetIRAnalysis()));
     if (assertions_on) {
         FPM.add(createVerifierPass());
@@ -142,18 +147,24 @@ bool ZigLLVMTargetMachineEmitToFile(LLVMTargetMachineRef targ_machine_ref, LLVMM
     MPM.add(createTargetTransformInfoWrapperPass(target_machine->getTargetIRAnalysis()));
     PMBuilder->populateModulePassManager(MPM);
 
+    // Set output pass.
     TargetMachine::CodeGenFileType ft;
-    switch (file_type) {
-        case LLVMAssemblyFile:
-            ft = TargetMachine::CGFT_AssemblyFile;
-            break;
-        default:
-            ft = TargetMachine::CGFT_ObjectFile;
-            break;
-    }
-    if (target_machine->addPassesToEmitFile(MPM, dest, ft)) {
-        *error_message = strdup("TargetMachine can't emit a file of this type");
-        return true;
+    if (output_type != ZigLLVM_EmitLLVMIr) {
+        switch (output_type) {
+            case ZigLLVM_EmitAssembly:
+                ft = TargetMachine::CGFT_AssemblyFile;
+                break;
+            case ZigLLVM_EmitBinary:
+                ft = TargetMachine::CGFT_ObjectFile;
+                break;
+            default:
+                abort();
+        }
+
+        if (target_machine->addPassesToEmitFile(MPM, dest, ft)) {
+            *error_message = strdup("TargetMachine can't emit a file of this type");
+            return true;
+        }
     }
 
     // run per function optimization passes
@@ -165,19 +176,33 @@ bool ZigLLVMTargetMachineEmitToFile(LLVMTargetMachineRef targ_machine_ref, LLVMM
 
     MPM.run(*module);
 
-    dest.close();
+    if (output_type == ZigLLVM_EmitLLVMIr) {
+        if (LLVMPrintModuleToFile(module_ref, filename, error_message)) {
+            return true;
+        }
+    }
 
     return false;
 }
 
+ZIG_EXTERN_C LLVMTypeRef ZigLLVMTokenTypeInContext(LLVMContextRef context_ref) {
+  return wrap(Type::getTokenTy(*unwrap(context_ref)));
+}
 
 LLVMValueRef ZigLLVMBuildCall(LLVMBuilderRef B, LLVMValueRef Fn, LLVMValueRef *Args,
-        unsigned NumArgs, unsigned CC, bool always_inline, const char *Name)
+        unsigned NumArgs, unsigned CC, ZigLLVM_FnInline fn_inline, const char *Name)
 {
     CallInst *call_inst = CallInst::Create(unwrap(Fn), makeArrayRef(unwrap(Args), NumArgs), Name);
     call_inst->setCallingConv(CC);
-    if (always_inline) {
-        call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::AlwaysInline);
+    switch (fn_inline) {
+        case ZigLLVM_FnInlineAuto:
+            break;
+        case ZigLLVM_FnInlineAlways:
+            call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::AlwaysInline);
+            break;
+        case ZigLLVM_FnInlineNever:
+            call_inst->addAttribute(AttributeList::FunctionIndex, Attribute::NoInline);
+            break;
     }
     return wrap(unwrap(B)->Insert(call_inst));
 }
@@ -400,8 +425,18 @@ unsigned ZigLLVMTag_DW_structure_type(void) {
     return dwarf::DW_TAG_structure_type;
 }
 
+unsigned ZigLLVMTag_DW_enumeration_type(void) {
+    return dwarf::DW_TAG_enumeration_type;
+}
+
+unsigned ZigLLVMTag_DW_union_type(void) {
+    return dwarf::DW_TAG_union_type;
+}
+
 ZigLLVMDIBuilder *ZigLLVMCreateDIBuilder(LLVMModuleRef module, bool allow_unresolved) {
-    DIBuilder *di_builder = new DIBuilder(*unwrap(module), allow_unresolved);
+    DIBuilder *di_builder = new(std::nothrow) DIBuilder(*unwrap(module), allow_unresolved);
+    if (di_builder == nullptr)
+        return nullptr;
     return reinterpret_cast<ZigLLVMDIBuilder *>(di_builder);
 }
 
@@ -574,7 +609,7 @@ ZigLLVMDILocation *ZigLLVMGetDebugLoc(unsigned line, unsigned col, ZigLLVMDIScop
 void ZigLLVMSetFastMath(LLVMBuilderRef builder_wrapped, bool on_state) {
     if (on_state) {
         FastMathFlags fmf;
-        fmf.setUnsafeAlgebra();
+        fmf.setFast();
         unwrap(builder_wrapped)->setFastMathFlags(fmf);
     } else {
         unwrap(builder_wrapped)->clearFastMathFlags();
@@ -603,7 +638,7 @@ void ZigLLVMAddFunctionAttrCold(LLVMValueRef fn_ref) {
     func->setAttributes(new_attr_set);
 }
 
-void ZigLLVMParseCommandLineOptions(int argc, const char *const *argv) {
+void ZigLLVMParseCommandLineOptions(size_t argc, const char *const *argv) {
     llvm::cl::ParseCommandLineOptions(argc, argv);
 }
 
@@ -612,11 +647,13 @@ static_assert((Triple::ArchType)ZigLLVM_LastArchType == Triple::LastArchType, ""
 static_assert((Triple::VendorType)ZigLLVM_LastVendorType == Triple::LastVendorType, "");
 static_assert((Triple::OSType)ZigLLVM_LastOSType == Triple::LastOSType, "");
 static_assert((Triple::EnvironmentType)ZigLLVM_LastEnvironmentType == Triple::LastEnvironmentType, "");
+static_assert((Triple::SubArchType)ZigLLVM_KalimbaSubArch_v5 == Triple::KalimbaSubArch_v5, "");
 
 static_assert((Triple::ObjectFormatType)ZigLLVM_UnknownObjectFormat == Triple::UnknownObjectFormat, "");
 static_assert((Triple::ObjectFormatType)ZigLLVM_COFF == Triple::COFF, "");
 static_assert((Triple::ObjectFormatType)ZigLLVM_ELF == Triple::ELF, "");
 static_assert((Triple::ObjectFormatType)ZigLLVM_MachO == Triple::MachO, "");
+static_assert((Triple::ObjectFormatType)ZigLLVM_Wasm == Triple::Wasm, "");
 
 const char *ZigLLVMGetArchTypeName(ZigLLVM_ArchType arch) {
     return (const char*)Triple::getArchTypeName((Triple::ArchType)arch).bytes_begin();
@@ -655,6 +692,8 @@ const char *ZigLLVMGetSubArchTypeName(ZigLLVM_SubArchType sub_arch) {
     switch (sub_arch) {
         case ZigLLVM_NoSubArch:
             return "(none)";
+        case ZigLLVM_ARMSubArch_v8_3a:
+            return "v8_3a";
         case ZigLLVM_ARMSubArch_v8_2a:
             return "v8_2a";
         case ZigLLVM_ARMSubArch_v8_1a:
@@ -757,32 +796,38 @@ LLVMValueRef ZigLLVMBuildAShrExact(LLVMBuilderRef builder, LLVMValueRef LHS, LLV
 }
 
 
-#include "buffer.hpp"
+class MyOStream: public raw_ostream {
+    public:
+        MyOStream(void (*_append_diagnostic)(void *, const char *, size_t), void *_context) :
+            raw_ostream(true), append_diagnostic(_append_diagnostic), context(_context), pos(0) {
 
-bool ZigLLDLink(ZigLLVM_ObjectFormatType oformat, const char **args, size_t arg_count, Buf *diag_buf) {
+        }
+        void write_impl(const char *ptr, size_t len) override {
+            append_diagnostic(context, ptr, len);
+            pos += len;
+        }
+        uint64_t current_pos() const override {
+            return pos;
+        }
+        void (*append_diagnostic)(void *, const char *, size_t);
+        void *context;
+        size_t pos;
+};
+
+
+bool ZigLLDLink(ZigLLVM_ObjectFormatType oformat, const char **args, size_t arg_count,
+        void (*append_diagnostic)(void *, const char *, size_t), void *context)
+{
     ArrayRef<const char *> array_ref_args(args, arg_count);
 
-    buf_resize(diag_buf, 0);
-    class MyOStream: public raw_ostream {
-        public:
-            MyOStream(Buf *_diag_buf) : raw_ostream(true), diag_buf(_diag_buf) {
-
-            }
-            void write_impl(const char *ptr, size_t len) override {
-                buf_append_mem(diag_buf, ptr, len);
-            }
-            uint64_t current_pos() const override {
-                return buf_len(diag_buf);
-            }
-            Buf *diag_buf;
-    } diag(diag_buf);
+    MyOStream diag(append_diagnostic, context);
 
     switch (oformat) {
         case ZigLLVM_UnknownObjectFormat:
-            zig_unreachable();
+            assert(false); // unreachable
 
         case ZigLLVM_COFF:
-            return lld::coff::link(array_ref_args);
+            return lld::coff::link(array_ref_args, false, diag);
 
         case ZigLLVM_ELF:
             return lld::elf::link(array_ref_args, false, diag);
@@ -791,7 +836,8 @@ bool ZigLLDLink(ZigLLVM_ObjectFormatType oformat, const char **args, size_t arg_
             return lld::mach_o::link(array_ref_args, diag);
 
         case ZigLLVM_Wasm:
-            zig_panic("ZigLLDLink for Wasm");
+            assert(false); // TODO ZigLLDLink for Wasm
     }
-    zig_unreachable();
+    assert(false); // unreachable
+    abort();
 }

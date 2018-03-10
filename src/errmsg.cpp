@@ -24,20 +24,20 @@ static void print_err_msg_type(ErrorMsg *err, ErrColor color, ErrType err_type) 
     bool is_tty = os_stderr_tty();
     if (color == ErrColorOn || (color == ErrColorAuto && is_tty)) {
         if (err_type == ErrTypeError) {
-            os_stderr_set_color(TermColorWhite);
+            os_stderr_set_color(TermColorBold);
             fprintf(stderr, "%s:%" ZIG_PRI_usize ":%" ZIG_PRI_usize ": ", path, line, col);
             os_stderr_set_color(TermColorRed);
             fprintf(stderr, "error:");
-            os_stderr_set_color(TermColorWhite);
+            os_stderr_set_color(TermColorBold);
             fprintf(stderr, " %s", text);
             os_stderr_set_color(TermColorReset);
             fprintf(stderr, "\n");
         } else if (err_type == ErrTypeNote) {
-            os_stderr_set_color(TermColorWhite);
+            os_stderr_set_color(TermColorBold);
             fprintf(stderr, "%s:%" ZIG_PRI_usize ":%" ZIG_PRI_usize ": ", path, line, col);
             os_stderr_set_color(TermColorCyan);
             fprintf(stderr, "note:");
-            os_stderr_set_color(TermColorWhite);
+            os_stderr_set_color(TermColorBold);
             fprintf(stderr, " %s", text);
             os_stderr_set_color(TermColorReset);
             fprintf(stderr, "\n");
@@ -123,6 +123,7 @@ ErrorMsg *err_msg_create_with_line(Buf *path, size_t line, size_t column,
     size_t end_line = line + 1;
     size_t line_end_offset = (end_line >= line_offsets->length) ? buf_len(source) : line_offsets->at(line + 1);
     size_t len = (line_end_offset + 1 > line_start_offset) ? (line_end_offset - line_start_offset - 1) : 0;
+    if (len == SIZE_MAX) len = 0;
 
     buf_init_from_mem(&err_msg->line_buf, buf_ptr(source) + line_start_offset, len);
 

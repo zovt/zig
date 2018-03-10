@@ -1,55 +1,62 @@
 const std = @import("../../index.zig");
+const builtin = @import("builtin");
 const os = std.os;
 const windows = std.os.windows;
 const assert = std.debug.assert;
 const mem = std.mem;
 const BufMap = std.BufMap;
+const cstr = std.cstr;
 
-error WaitAbandoned;
-error WaitTimeOut;
-error Unexpected;
+pub const WaitError = error {
+    WaitAbandoned,
+    WaitTimeOut,
+    Unexpected,
+};
 
-pub fn windowsWaitSingle(handle: windows.HANDLE, milliseconds: windows.DWORD) -> %void {
+pub fn windowsWaitSingle(handle: windows.HANDLE, milliseconds: windows.DWORD) WaitError!void {
     const result = windows.WaitForSingleObject(handle, milliseconds);
     return switch (result) {
         windows.WAIT_ABANDONED => error.WaitAbandoned,
         windows.WAIT_OBJECT_0 => {},
         windows.WAIT_TIMEOUT => error.WaitTimeOut,
-        windows.WAIT_FAILED => {
+        windows.WAIT_FAILED => x: {
             const err = windows.GetLastError();
-            switch (err) {
+            break :x switch (err) {
                 else => os.unexpectedErrorWindows(err),
-            }
+            };
         },
         else => error.Unexpected,
     };
 }
 
-pub fn windowsClose(handle: windows.HANDLE) {
+pub fn windowsClose(handle: windows.HANDLE) void {
     assert(windows.CloseHandle(handle) != 0);
 }
 
-error SystemResources;
-error OperationAborted;
-error IoPending;
-error BrokenPipe;
+pub const WriteError = error {
+    SystemResources,
+    OperationAborted,
+    IoPending,
+    BrokenPipe,
+    Unexpected,
+};
 
-pub fn windowsWrite(handle: windows.HANDLE, bytes: []const u8) -> %void {
+pub fn windowsWrite(handle: windows.HANDLE, bytes: []const u8) WriteError!void {
     if (windows.WriteFile(handle, @ptrCast(&const c_void, bytes.ptr), u32(bytes.len), null, null) == 0) {
         const err = windows.GetLastError();
         return switch (err) {
-            windows.ERROR.INVALID_USER_BUFFER => error.SystemResources,
-            windows.ERROR.NOT_ENOUGH_MEMORY => error.SystemResources,
-            windows.ERROR.OPERATION_ABORTED => error.OperationAborted,
-            windows.ERROR.NOT_ENOUGH_QUOTA => error.SystemResources,
-            windows.ERROR.IO_PENDING => error.IoPending,
-            windows.ERROR.BROKEN_PIPE => error.BrokenPipe,
+            windows.ERROR.INVALID_USER_BUFFER => WriteError.SystemResources,
+            windows.ERROR.NOT_ENOUGH_MEMORY => WriteError.SystemResources,
+            windows.ERROR.OPERATION_ABORTED => WriteError.OperationAborted,
+            windows.ERROR.NOT_ENOUGH_QUOTA => WriteError.SystemResources,
+            windows.ERROR.IO_PENDING => WriteError.IoPending,
+            windows.ERROR.BROKEN_PIPE => WriteError.BrokenPipe,
             else => os.unexpectedErrorWindows(err),
         };
     }
 }
 
-pub fn windowsIsTty(handle: windows.HANDLE) -> bool {
+pub fn windowsIsTty(handle: windows.HANDLE) bool {
     if (windowsIsCygwinPty(handle))
         return true;
 
@@ -57,7 +64,7 @@ pub fn windowsIsTty(handle: windows.HANDLE) -> bool {
     return windows.GetConsoleMode(handle, &out) != 0;
 }
 
-pub fn windowsIsCygwinPty(handle: windows.HANDLE) -> bool {
+pub fn windowsIsCygwinPty(handle: windows.HANDLE) bool {
     const size = @sizeOf(windows.FILE_NAME_INFO);
     var name_info_bytes align(@alignOf(windows.FILE_NAME_INFO)) = []u8{0} ** (size + windows.MAX_PATH);
 
@@ -74,43 +81,35 @@ pub fn windowsIsCygwinPty(handle: windows.HANDLE) -> bool {
            mem.indexOf(u16, name_wide, []u16{'-','p','t','y'}) != null;
 }
 
-error SharingViolation;
-error PipeBusy;
+pub const OpenError = error {
+    SharingViolation,
+    PathAlreadyExists,
+    FileNotFound,
+    AccessDenied,
+    PipeBusy,
+    Unexpected,
+    OutOfMemory,
+};
 
-/// `file_path` may need to be copied in memory to add a null terminating byte. In this case
-/// a fixed size buffer of size ::max_noalloc_path_len is an attempted solution. If the fixed
-/// size buffer is too small, and the provided allocator is null, ::error.NameTooLong is returned.
-/// otherwise if the fixed size buffer is too small, allocator is used to obtain the needed memory.
-pub fn windowsOpen(file_path: []const u8, desired_access: windows.DWORD, share_mode: windows.DWORD,
-    creation_disposition: windows.DWORD, flags_and_attrs: windows.DWORD, allocator: ?&mem.Allocator) -> %windows.HANDLE
+/// `file_path` needs to be copied in memory to add a null terminating byte, hence the allocator.
+pub fn windowsOpen(allocator: &mem.Allocator, file_path: []const u8, desired_access: windows.DWORD, share_mode: windows.DWORD,
+    creation_disposition: windows.DWORD, flags_and_attrs: windows.DWORD)
+    OpenError!windows.HANDLE
 {
-    var stack_buf: [os.max_noalloc_path_len]u8 = undefined;
-    var path0: []u8 = undefined;
-    var need_free = false;
-    defer if (need_free) (??allocator).free(path0);
+    const path_with_null = try cstr.addNullByte(allocator, file_path);
+    defer allocator.free(path_with_null);
 
-    if (file_path.len < stack_buf.len) {
-        path0 = stack_buf[0..file_path.len + 1];
-    } else if (allocator) |a| {
-        path0 = %return a.alloc(u8, file_path.len + 1);
-        need_free = true;
-    } else {
-        return error.NameTooLong;
-    }
-    mem.copy(u8, path0, file_path);
-    path0[file_path.len] = 0;
-
-    const result = windows.CreateFileA(path0.ptr, desired_access, share_mode, null, creation_disposition,
+    const result = windows.CreateFileA(path_with_null.ptr, desired_access, share_mode, null, creation_disposition,
         flags_and_attrs, null);
 
     if (result == windows.INVALID_HANDLE_VALUE) {
         const err = windows.GetLastError();
         return switch (err) {
-            windows.ERROR.SHARING_VIOLATION => error.SharingViolation,
-            windows.ERROR.ALREADY_EXISTS, windows.ERROR.FILE_EXISTS => error.PathAlreadyExists,
-            windows.ERROR.FILE_NOT_FOUND => error.FileNotFound,
-            windows.ERROR.ACCESS_DENIED => error.AccessDenied,
-            windows.ERROR.PIPE_BUSY => error.PipeBusy,
+            windows.ERROR.SHARING_VIOLATION => OpenError.SharingViolation,
+            windows.ERROR.ALREADY_EXISTS, windows.ERROR.FILE_EXISTS => OpenError.PathAlreadyExists,
+            windows.ERROR.FILE_NOT_FOUND => OpenError.FileNotFound,
+            windows.ERROR.ACCESS_DENIED => OpenError.AccessDenied,
+            windows.ERROR.PIPE_BUSY => OpenError.PipeBusy,
             else => os.unexpectedErrorWindows(err),
         };
     }
@@ -119,9 +118,9 @@ pub fn windowsOpen(file_path: []const u8, desired_access: windows.DWORD, share_m
 }
 
 /// Caller must free result.
-pub fn createWindowsEnvBlock(allocator: &mem.Allocator, env_map: &const BufMap) -> %[]u8 {
+pub fn createWindowsEnvBlock(allocator: &mem.Allocator, env_map: &const BufMap) ![]u8 {
     // count bytes needed
-    const bytes_needed = {
+    const bytes_needed = x: {
         var bytes_needed: usize = 1; // 1 for the final null byte
         var it = env_map.iterator();
         while (it.next()) |pair| {
@@ -129,10 +128,10 @@ pub fn createWindowsEnvBlock(allocator: &mem.Allocator, env_map: &const BufMap) 
             // +1 for null byte
             bytes_needed += pair.key.len + pair.value.len + 2;
         }
-        bytes_needed
+        break :x bytes_needed;
     };
-    const result = %return allocator.alloc(u8, bytes_needed);
-    %defer allocator.free(result);
+    const result = try allocator.alloc(u8, bytes_needed);
+    errdefer allocator.free(result);
 
     var it = env_map.iterator();
     var i: usize = 0;
@@ -149,3 +148,26 @@ pub fn createWindowsEnvBlock(allocator: &mem.Allocator, env_map: &const BufMap) 
     result[i] = 0;
     return result;
 }
+
+pub fn windowsLoadDll(allocator: &mem.Allocator, dll_path: []const u8) !windows.HMODULE {
+    const padded_buff = try cstr.addNullByte(allocator, dll_path);
+    defer allocator.free(padded_buff);
+    return windows.LoadLibraryA(padded_buff.ptr) ?? error.DllNotFound;
+}
+
+pub fn windowsUnloadDll(hModule: windows.HMODULE) void {
+    assert(windows.FreeLibrary(hModule)!= 0);
+}
+
+
+test "InvalidDll" {
+    if (builtin.os != builtin.Os.windows) return;
+
+    const DllName = "asdf.dll";
+    const allocator = std.debug.global_allocator;
+    const handle = os.windowsLoadDll(allocator, DllName) catch  |err| {
+        assert(err == error.DllNotFound);
+        return;
+    };
+}
+

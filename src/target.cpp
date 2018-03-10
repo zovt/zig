@@ -13,6 +13,7 @@
 #include <stdio.h>
 
 static const ArchType arch_list[] = {
+    {ZigLLVM_arm, ZigLLVM_ARMSubArch_v8_3a},
     {ZigLLVM_arm, ZigLLVM_ARMSubArch_v8_2a},
     {ZigLLVM_arm, ZigLLVM_ARMSubArch_v8_1a},
     {ZigLLVM_arm, ZigLLVM_ARMSubArch_v8},
@@ -33,9 +34,30 @@ static const ArchType arch_list[] = {
     {ZigLLVM_arm, ZigLLVM_ARMSubArch_v5te},
     {ZigLLVM_arm, ZigLLVM_ARMSubArch_v4t},
 
-    {ZigLLVM_armeb, ZigLLVM_NoSubArch},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v8_3a},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v8_2a},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v8_1a},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v8},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v8r},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v8m_baseline},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v8m_mainline},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v7},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v7em},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v7m},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v7s},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v7k},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v7ve},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v6},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v6m},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v6k},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v6t2},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v5},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v5te},
+    {ZigLLVM_armeb, ZigLLVM_ARMSubArch_v4t},
+
     {ZigLLVM_aarch64, ZigLLVM_NoSubArch},
     {ZigLLVM_aarch64_be, ZigLLVM_NoSubArch},
+    {ZigLLVM_arc, ZigLLVM_NoSubArch},
     {ZigLLVM_avr, ZigLLVM_NoSubArch},
     {ZigLLVM_bpfel, ZigLLVM_NoSubArch},
     {ZigLLVM_bpfeb, ZigLLVM_NoSubArch},
@@ -105,45 +127,46 @@ static const ZigLLVM_VendorType vendor_list[] = {
     ZigLLVM_SUSE,
 };
 
-static const ZigLLVM_OSType os_list[] = {
-    ZigLLVM_UnknownOS,
-    ZigLLVM_Ananas,
-    ZigLLVM_CloudABI,
-    ZigLLVM_Darwin,
-    ZigLLVM_DragonFly,
-    ZigLLVM_FreeBSD,
-    ZigLLVM_Fuchsia,
-    ZigLLVM_IOS,
-    ZigLLVM_KFreeBSD,
-    ZigLLVM_Linux,
-    ZigLLVM_Lv2,
-    ZigLLVM_MacOSX,
-    ZigLLVM_NetBSD,
-    ZigLLVM_OpenBSD,
-    ZigLLVM_Solaris,
-    ZigLLVM_Win32,
-    ZigLLVM_Haiku,
-    ZigLLVM_Minix,
-    ZigLLVM_RTEMS,
-    ZigLLVM_NaCl,
-    ZigLLVM_CNK,
-    ZigLLVM_Bitrig,
-    ZigLLVM_AIX,
-    ZigLLVM_CUDA,
-    ZigLLVM_NVCL,
-    ZigLLVM_AMDHSA,
-    ZigLLVM_PS4,
-    ZigLLVM_ELFIAMCU,
-    ZigLLVM_TvOS,
-    ZigLLVM_WatchOS,
-    ZigLLVM_Mesa3D,
-    ZigLLVM_Contiki,
+static const Os os_list[] = {
+    OsFreestanding,
+    OsAnanas,
+    OsCloudABI,
+    OsDragonFly,
+    OsFreeBSD,
+    OsFuchsia,
+    OsIOS,
+    OsKFreeBSD,
+    OsLinux,
+    OsLv2,        // PS3
+    OsMacOSX,
+    OsNetBSD,
+    OsOpenBSD,
+    OsSolaris,
+    OsWindows,
+    OsHaiku,
+    OsMinix,
+    OsRTEMS,
+    OsNaCl,       // Native Client
+    OsCNK,        // BG/P Compute-Node Kernel
+    OsBitrig,
+    OsAIX,
+    OsCUDA,       // NVIDIA CUDA
+    OsNVCL,       // NVIDIA OpenCL
+    OsAMDHSA,     // AMD HSA Runtime
+    OsPS4,
+    OsELFIAMCU,
+    OsTvOS,       // Apple tvOS
+    OsWatchOS,    // Apple watchOS
+    OsMesa3D,
+    OsContiki,
+    OsZen,
 };
 
 static const ZigLLVM_EnvironmentType environ_list[] = {
     ZigLLVM_UnknownEnvironment,
 
     ZigLLVM_GNU,
+    ZigLLVM_GNUABIN32,
     ZigLLVM_GNUABI64,
     ZigLLVM_GNUEABI,
     ZigLLVM_GNUEABIHF,
@@ -161,6 +184,7 @@ static const ZigLLVM_EnvironmentType environ_list[] = {
     ZigLLVM_AMDOpenCL,
     ZigLLVM_CoreCLR,
     ZigLLVM_OpenCL,
+    ZigLLVM_Simulator,
 };
 
 static const ZigLLVM_ObjectFormatType oformat_list[] = {
@@ -209,12 +233,187 @@ ZigLLVM_VendorType get_target_vendor(size_t index) {
 size_t target_os_count(void) {
     return array_length(os_list);
 }
-ZigLLVM_OSType get_target_os(size_t index) {
+Os get_target_os(size_t index) {
     return os_list[index];
 }
 
-const char *get_target_os_name(ZigLLVM_OSType os_type) {
-    return (os_type == ZigLLVM_UnknownOS) ? "freestanding" : ZigLLVMGetOSTypeName(os_type);
+static ZigLLVM_OSType get_llvm_os_type(Os os_type) {
+    switch (os_type) {
+        case OsFreestanding:
+        case OsZen:
+            return ZigLLVM_UnknownOS;
+        case OsAnanas:
+            return ZigLLVM_Ananas;
+        case OsCloudABI:
+            return ZigLLVM_CloudABI;
+        case OsDragonFly:
+            return ZigLLVM_DragonFly;
+        case OsFreeBSD:
+            return ZigLLVM_FreeBSD;
+        case OsFuchsia:
+            return ZigLLVM_Fuchsia;
+        case OsIOS:
+            return ZigLLVM_IOS;
+        case OsKFreeBSD:
+            return ZigLLVM_KFreeBSD;
+        case OsLinux:
+            return ZigLLVM_Linux;
+        case OsLv2:
+            return ZigLLVM_Lv2;
+        case OsMacOSX:
+            return ZigLLVM_MacOSX;
+        case OsNetBSD:
+            return ZigLLVM_NetBSD;
+        case OsOpenBSD:
+            return ZigLLVM_OpenBSD;
+        case OsSolaris:
+            return ZigLLVM_Solaris;
+        case OsWindows:
+            return ZigLLVM_Win32;
+        case OsHaiku:
+            return ZigLLVM_Haiku;
+        case OsMinix:
+            return ZigLLVM_Minix;
+        case OsRTEMS:
+            return ZigLLVM_RTEMS;
+        case OsNaCl:
+            return ZigLLVM_NaCl;
+        case OsCNK:
+            return ZigLLVM_CNK;
+        case OsBitrig:
+            return ZigLLVM_Bitrig;
+        case OsAIX:
+            return ZigLLVM_AIX;
+        case OsCUDA:
+            return ZigLLVM_CUDA;
+        case OsNVCL:
+            return ZigLLVM_NVCL;
+        case OsAMDHSA:
+            return ZigLLVM_AMDHSA;
+        case OsPS4:
+            return ZigLLVM_PS4;
+        case OsELFIAMCU:
+            return ZigLLVM_ELFIAMCU;
+        case OsTvOS:
+            return ZigLLVM_TvOS;
+        case OsWatchOS:
+            return ZigLLVM_WatchOS;
+        case OsMesa3D:
+            return ZigLLVM_Mesa3D;
+        case OsContiki:
+            return ZigLLVM_Contiki;
+    }
+    zig_unreachable();
+}
+
+static Os get_zig_os_type(ZigLLVM_OSType os_type) {
+    switch (os_type) {
+        case ZigLLVM_UnknownOS:
+            return OsFreestanding;
+        case ZigLLVM_Ananas:
+            return OsAnanas;
+        case ZigLLVM_CloudABI:
+            return OsCloudABI;
+        case ZigLLVM_DragonFly:
+            return OsDragonFly;
+        case ZigLLVM_FreeBSD:
+            return OsFreeBSD;
+        case ZigLLVM_Fuchsia:
+            return OsFuchsia;
+        case ZigLLVM_IOS:
+            return OsIOS;
+        case ZigLLVM_KFreeBSD:
+            return OsKFreeBSD;
+        case ZigLLVM_Linux:
+            return OsLinux;
+        case ZigLLVM_Lv2:
+            return OsLv2;
+        case ZigLLVM_Darwin:
+        case ZigLLVM_MacOSX:
+            return OsMacOSX;
+        case ZigLLVM_NetBSD:
+            return OsNetBSD;
+        case ZigLLVM_OpenBSD:
+            return OsOpenBSD;
+        case ZigLLVM_Solaris:
+            return OsSolaris;
+        case ZigLLVM_Win32:
+            return OsWindows;
+        case ZigLLVM_Haiku:
+            return OsHaiku;
+        case ZigLLVM_Minix:
+            return OsMinix;
+        case ZigLLVM_RTEMS:
+            return OsRTEMS;
+        case ZigLLVM_NaCl:
+            return OsNaCl;
+        case ZigLLVM_CNK:
+            return OsCNK;
+        case ZigLLVM_Bitrig:
+            return OsBitrig;
+        case ZigLLVM_AIX:
+            return OsAIX;
+        case ZigLLVM_CUDA:
+            return OsCUDA;
+        case ZigLLVM_NVCL:
+            return OsNVCL;
+        case ZigLLVM_AMDHSA:
+            return OsAMDHSA;
+        case ZigLLVM_PS4:
+            return OsPS4;
+        case ZigLLVM_ELFIAMCU:
+            return OsELFIAMCU;
+        case ZigLLVM_TvOS:
+            return OsTvOS;
+        case ZigLLVM_WatchOS:
+            return OsWatchOS;
+        case ZigLLVM_Mesa3D:
+            return OsMesa3D;
+        case ZigLLVM_Contiki:
+            return OsContiki;
+    }
+    zig_unreachable();
+}
+
+const char *get_target_os_name(Os os_type) {
+    switch (os_type) {
+        case OsFreestanding:
+            return "freestanding";
+        case OsZen:
+            return "zen";
+        case OsAnanas:
+        case OsCloudABI:
+        case OsDragonFly:
+        case OsFreeBSD:
+        case OsFuchsia:
+        case OsIOS:
+        case OsKFreeBSD:
+        case OsLinux:
+        case OsLv2:        // PS3
+        case OsMacOSX:
+        case OsNetBSD:
+        case OsOpenBSD:
+        case OsSolaris:
+        case OsWindows:
+        case OsHaiku:
+        case OsMinix:
+        case OsRTEMS:
+        case OsNaCl:       // Native Client
+        case OsCNK:        // BG/P Compute-Node Kernel
+        case OsBitrig:
+        case OsAIX:
+        case OsCUDA:       // NVIDIA CUDA
+        case OsNVCL:       // NVIDIA OpenCL
+        case OsAMDHSA:     // AMD HSA Runtime
+        case OsPS4:
+        case OsELFIAMCU:
+        case OsTvOS:       // Apple tvOS
+        case OsWatchOS:    // Apple watchOS
+        case OsMesa3D:
+        case OsContiki:
+            return ZigLLVMGetOSTypeName(get_llvm_os_type(os_type));
+    }
+    zig_unreachable();
 }
 
 size_t target_environ_count(void) {
@@ -225,20 +424,22 @@ ZigLLVM_EnvironmentType get_target_environ(size_t index) {
 }
 
 void get_native_target(ZigTarget *target) {
+    ZigLLVM_OSType os_type;
     ZigLLVMGetNativeTarget(
             &target->arch.arch,
             &target->arch.sub_arch,
             &target->vendor,
-            &target->os,
+            &os_type,
             &target->env_type,
             &target->oformat);
+    target->os = get_zig_os_type(os_type);
 }
 
 void get_unknown_target(ZigTarget *target) {
     target->arch.arch = ZigLLVM_UnknownArch;
     target->arch.sub_arch = ZigLLVM_NoSubArch;
     target->vendor = ZigLLVM_UnknownVendor;
-    target->os = ZigLLVM_UnknownOS;
+    target->os = OsFreestanding;
     target->env_type = ZigLLVM_UnknownEnvironment;
     target->oformat = ZigLLVM_UnknownObjectFormat;
 }
@@ -265,9 +466,9 @@ int parse_target_arch(const char *str, ArchType *out_arch) {
     return ErrorFileNotFound;
 }
 
-int parse_target_os(const char *str, ZigLLVM_OSType *out_os) {
+int parse_target_os(const char *str, Os *out_os) {
     for (size_t i = 0; i < array_length(os_list); i += 1) {
-        ZigLLVM_OSType os = os_list[i];
+        Os os = os_list[i];
         const char *os_name = get_target_os_name(os);
         if (strcmp(os_name, str) == 0) {
             *out_os = os;
@@ -304,15 +505,14 @@ void get_target_triple(Buf *triple, const ZigTarget *target) {
     buf_resize(triple, 0);
     buf_appendf(triple, "%s-%s-%s-%s", arch_name,
             ZigLLVMGetVendorTypeName(target->vendor),
-            ZigLLVMGetOSTypeName(target->os),
+            ZigLLVMGetOSTypeName(get_llvm_os_type(target->os)),
             ZigLLVMGetEnvironmentTypeName(target->env_type));
 }
 
 static bool is_os_darwin(ZigTarget *target) {
     switch (target->os) {
-        case ZigLLVM_Darwin:
-        case ZigLLVM_IOS:
-        case ZigLLVM_MacOSX:
+        case OsMacOSX:
+        case OsIOS:
             return true;
         default:
             return false;
@@ -333,7 +533,7 @@ void resolve_target_object_format(ZigTarget *target) {
         case ZigLLVM_x86_64:
             if (is_os_darwin(target)) {
                 target->oformat = ZigLLVM_MachO;
-            } else if (target->os == ZigLLVM_Win32) {
+            } else if (target->os == OsWindows) {
                 target->oformat = ZigLLVM_COFF;
             } else {
                 target->oformat = ZigLLVM_ELF;
@@ -345,6 +545,7 @@ void resolve_target_object_format(ZigTarget *target) {
         case ZigLLVM_amdil:
         case ZigLLVM_amdil64:
         case ZigLLVM_armeb:
+        case ZigLLVM_arc:
         case ZigLLVM_avr:
         case ZigLLVM_bpfeb:
         case ZigLLVM_bpfel:
@@ -407,6 +608,7 @@ static int get_arch_pointer_bit_width(ZigLLVM_ArchType arch) {
         case ZigLLVM_msp430:
             return 16;
 
+        case ZigLLVM_arc:
         case ZigLLVM_arm:
         case ZigLLVM_armeb:
         case ZigLLVM_hexagon:
@@ -463,7 +665,7 @@ static int get_arch_pointer_bit_width(ZigLLVM_ArchType arch) {
 
 uint32_t target_c_type_size_in_bits(const ZigTarget *target, CIntType id) {
     switch (target->os) {
-        case ZigLLVM_UnknownOS:
+        case OsFreestanding:
             switch (id) {
                 case CIntTypeShort:
                 case CIntTypeUShort:
@@ -480,10 +682,10 @@ uint32_t target_c_type_size_in_bits(const ZigTarget *target, CIntType id) {
                 case CIntTypeCount:
                     zig_unreachable();
             }
-        case ZigLLVM_Linux:
-        case ZigLLVM_FreeBSD:
-        case ZigLLVM_Darwin:
-        case ZigLLVM_MacOSX:
+        case OsFreeBSD:
+        case OsLinux:
+        case OsMacOSX:
+        case OsZen:
             switch (id) {
                 case CIntTypeShort:
                 case CIntTypeUShort:
@@ -500,7 +702,7 @@ uint32_t target_c_type_size_in_bits(const ZigTarget *target, CIntType id) {
                 case CIntTypeCount:
                     zig_unreachable();
             }
-        case ZigLLVM_Win32:
+        case OsWindows:
             switch (id) {
                 case CIntTypeShort:
                 case CIntTypeUShort:
@@ -516,47 +718,55 @@ uint32_t target_c_type_size_in_bits(const ZigTarget *target, CIntType id) {
                 case CIntTypeCount:
                     zig_unreachable();
             }
-        case ZigLLVM_Ananas:
-        case ZigLLVM_CloudABI:
-        case ZigLLVM_DragonFly:
-        case ZigLLVM_IOS:
-        case ZigLLVM_KFreeBSD:
-        case ZigLLVM_Lv2:
-        case ZigLLVM_NetBSD:
-        case ZigLLVM_OpenBSD:
-        case ZigLLVM_Solaris:
-        case ZigLLVM_Haiku:
-        case ZigLLVM_Minix:
-        case ZigLLVM_RTEMS:
-        case ZigLLVM_NaCl:
-        case ZigLLVM_CNK:
-        case ZigLLVM_Bitrig:
-        case ZigLLVM_AIX:
-        case ZigLLVM_CUDA:
-        case ZigLLVM_NVCL:
-        case ZigLLVM_AMDHSA:
-        case ZigLLVM_PS4:
-        case ZigLLVM_ELFIAMCU:
-        case ZigLLVM_TvOS:
-        case ZigLLVM_WatchOS:
-        case ZigLLVM_Mesa3D:
-        case ZigLLVM_Fuchsia:
-        case ZigLLVM_Contiki:
+        case OsAnanas:
+        case OsCloudABI:
+        case OsDragonFly:
+        case OsIOS:
+        case OsKFreeBSD:
+        case OsLv2:
+        case OsNetBSD:
+        case OsOpenBSD:
+        case OsSolaris:
+        case OsHaiku:
+        case OsMinix:
+        case OsRTEMS:
+        case OsNaCl:
+        case OsCNK:
+        case OsBitrig:
+        case OsAIX:
+        case OsCUDA:
+        case OsNVCL:
+        case OsAMDHSA:
+        case OsPS4:
+        case OsELFIAMCU:
+        case OsTvOS:
+        case OsWatchOS:
+        case OsMesa3D:
+        case OsFuchsia:
+        case OsContiki:
             zig_panic("TODO c type size in bits for this target");
     }
     zig_unreachable();
 }
 
 const char *target_o_file_ext(ZigTarget *target) {
-    if (target->env_type == ZigLLVM_MSVC || target->os == ZigLLVM_Win32) {
+    if (target->env_type == ZigLLVM_MSVC || target->os == OsWindows) {
         return ".obj";
     } else {
         return ".o";
     }
 }
 
+const char *target_asm_file_ext(ZigTarget *target) {
+    return ".s";
+}
+
+const char *target_llvm_ir_file_ext(ZigTarget *target) {
+    return ".ll";
+}
+
 const char *target_exe_file_ext(ZigTarget *target) {
-    if (target->os == ZigLLVM_Win32) {
+    if (target->os == OsWindows) {
         return ".exe";
     } else {
         return "";
@@ -577,7 +787,7 @@ static FloatAbi get_float_abi(ZigTarget *target) {
     {
         return FloatAbiHard;
     } else {
-        zig_panic("TODO: user needs to input if they want hard or soft floating point");
+        return FloatAbiSoft;
     }
 }
 
@@ -656,12 +866,12 @@ bool target_can_exec(const ZigTarget *host_target, const ZigTarget *guest_target
         return true;
     }
 
-    if (guest_target->os == ZigLLVM_Win32 && host_target->os == ZigLLVM_Win32 &&
+    if (guest_target->os == OsWindows && host_target->os == OsWindows &&
         host_target->arch.arch == ZigLLVM_x86_64 && guest_target->arch.arch == ZigLLVM_x86)
     {
         // 64-bit windows can run 32-bit programs
         return true;
     }
-    
+
     return false;
 }

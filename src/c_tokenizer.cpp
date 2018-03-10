@@ -91,6 +91,9 @@
     IDENT_START: \
     case DIGIT
 
+#define LINE_ENDING \
+         '\r': \
+    case '\n'
 
 static void begin_token(CTokenize *ctok, CTokId id) {
     assert(ctok->cur_tok == nullptr);
@@ -117,6 +120,10 @@ static void begin_token(CTokenize *ctok, CTokId id) {
         case CTokIdLParen:
         case CTokIdRParen:
         case CTokIdEOF:
+        case CTokIdDot:
+        case CTokIdAsterisk:
+        case CTokIdBang:
+        case CTokIdTilde:
             break;
     }
 }
@@ -191,7 +198,7 @@ void tokenize_c_macro(CTokenize *ctok, const uint8_t *c) {
                     case '\\':
                         ctok->state = CTokStateBackslash;
                         break;
-                    case '\n':
+                    case LINE_ENDING:
                         goto found_end_of_macro;
                     case IDENT_START:
                         ctok->state = CTokStateIdentifier;
@@ -213,9 +220,8 @@ void tokenize_c_macro(CTokenize *ctok, const uint8_t *c) {
                         buf_append_char(&ctok->buf, '0');
                         break;
                     case '.':
-                        begin_token(ctok, CTokIdNumLitFloat);
-                        ctok->state = CTokStateFloat;
-                        buf_init_from_str(&ctok->buf, "0.");
+                        begin_token(ctok, CTokIdDot);
+                        end_token(ctok);
                         break;
                     case '(':
                         begin_token(ctok, CTokIdLParen);
@@ -225,8 +231,20 @@ void tokenize_c_macro(CTokenize *ctok, const uint8_t *c) {
                         begin_token(ctok, CTokIdRParen);
                         end_token(ctok);
                         break;
+                    case '*':
+                        begin_token(ctok, CTokIdAsterisk);
+                        end_token(ctok);
+                        break;
                     case '-':
                         begin_token(ctok, CTokIdMinus);
+                        end_token(ctok);
+                        break;
+                    case '!':
+                        begin_token(ctok, CTokIdBang);
+                        end_token(ctok);
+                        break;
+                    case '~':
+                        begin_token(ctok, CTokIdTilde);
                         end_token(ctok);
                         break;
                     default:
@@ -235,6 +253,8 @@ void tokenize_c_macro(CTokenize *ctok, const uint8_t *c) {
                 break;
             case CTokStateFloat:
                 switch (*c) {
+                    case '.':
+                        break;
                     case 'e':
                     case 'E':
                         buf_append_char(&ctok->buf, 'e');

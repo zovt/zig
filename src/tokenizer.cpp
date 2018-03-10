@@ -110,21 +110,24 @@ static const struct ZigKeyword zig_keywords[] = {
     {"align", TokenIdKeywordAlign},
     {"and", TokenIdKeywordAnd},
     {"asm", TokenIdKeywordAsm},
+    {"async", TokenIdKeywordAsync},
+    {"await", TokenIdKeywordAwait},
     {"break", TokenIdKeywordBreak},
-    {"coldcc", TokenIdKeywordColdCC},
+    {"cancel", TokenIdKeywordCancel},
+    {"catch", TokenIdKeywordCatch},
     {"comptime", TokenIdKeywordCompTime},
     {"const", TokenIdKeywordConst},
     {"continue", TokenIdKeywordContinue},
     {"defer", TokenIdKeywordDefer},
     {"else", TokenIdKeywordElse},
     {"enum", TokenIdKeywordEnum},
+    {"errdefer", TokenIdKeywordErrdefer},
     {"error", TokenIdKeywordError},
     {"export", TokenIdKeywordExport},
     {"extern", TokenIdKeywordExtern},
     {"false", TokenIdKeywordFalse},
     {"fn", TokenIdKeywordFn},
     {"for", TokenIdKeywordFor},
-    {"goto", TokenIdKeywordGoto},
     {"if", TokenIdKeywordIf},
     {"inline", TokenIdKeywordInline},
     {"nakedcc", TokenIdKeywordNakedCC},
@@ -133,13 +136,17 @@ static const struct ZigKeyword zig_keywords[] = {
     {"or", TokenIdKeywordOr},
     {"packed", TokenIdKeywordPacked},
     {"pub", TokenIdKeywordPub},
+    {"resume", TokenIdKeywordResume},
     {"return", TokenIdKeywordReturn},
+    {"section", TokenIdKeywordSection},
     {"stdcallcc", TokenIdKeywordStdcallCC},
     {"struct", TokenIdKeywordStruct},
+    {"suspend", TokenIdKeywordSuspend},
     {"switch", TokenIdKeywordSwitch},
     {"test", TokenIdKeywordTest},
     {"this", TokenIdKeywordThis},
     {"true", TokenIdKeywordTrue},
+    {"try", TokenIdKeywordTry},
     {"undefined", TokenIdKeywordUndefined},
     {"union", TokenIdKeywordUnion},
     {"unreachable", TokenIdKeywordUnreachable},
@@ -192,7 +199,8 @@ enum TokenizeState {
     TokenizeStateSawMinusPercent,
     TokenizeStateSawAmpersand,
     TokenizeStateSawCaret,
-    TokenizeStateSawPipe,
+    TokenizeStateSawBar,
+    TokenizeStateSawBarBar,
     TokenizeStateLineComment,
     TokenizeStateLineString,
     TokenizeStateLineStringEnd,
@@ -416,6 +424,44 @@ static void handle_string_escape(Tokenize *t, uint8_t c) {
     }
 }
 
+static const char* get_escape_shorthand(uint8_t c) {
+    switch (c) {
+        case '\0':
+            return "\\0";
+        case '\a':
+            return "\\a";
+        case '\b':
+            return "\\b";
+        case '\t':
+            return "\\t";
+        case '\n':
+            return "\\n";
+        case '\v':
+            return "\\v";
+        case '\f':
+            return "\\f";
+        case '\r':
+            return "\\r";
+        default:
+            return nullptr;
+    }
+}
+
+static void invalid_char_error(Tokenize *t, uint8_t c) {
+    if (c == '\r') {
+        tokenize_error(t, "invalid carriage return, only '\\n' line endings are supported");
+    } else if (isprint(c)) {
+        tokenize_error(t, "invalid character: '%c'", c);
+    } else {
+        const char *sh = get_escape_shorthand(c);
+        if (sh) {
+            tokenize_error(t, "invalid character: '%s'", sh);
+        } else {
+            tokenize_error(t, "invalid character: '\\x%x'", c);
+        }
+    }
+}
+
 void tokenize(Buf *buf, Tokenization *out) {
     Tokenize t = {0};
     t.out = out;
@@ -553,7 +599,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                         break;
                     case '|':
                         begin_token(&t, TokenIdBinOr);
-                        t.state = TokenizeStateSawPipe;
+                        t.state = TokenizeStateSawBar;
                         break;
                     case '=':
                         begin_token(&t, TokenIdEq);
@@ -580,7 +626,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                         t.state = TokenizeStateSawQuestionMark;
                         break;
                     default:
-                        tokenize_error(&t, "invalid character: '%c'", c);
+                        invalid_char_error(&t, c);
                 }
                 break;
             case TokenizeStateSawQuestionMark:
@@ -775,11 +821,6 @@ void tokenize(Buf *buf, Tokenization *out) {
                         end_token(&t);
                         t.state = TokenizeStateStart;
                         break;
-                    case '%':
-                        set_token_id(&t, t.cur_tok, TokenIdPercentPercent);
-                        end_token(&t);
-                        t.state = TokenizeStateStart;
-                        break;
                     default:
                         t.pos -= 1;
                         end_token(&t);
@@ -852,10 +893,28 @@ void tokenize(Buf *buf, Tokenization *out) {
                         continue;
                 }
                 break;
-            case TokenizeStateSawPipe:
+            case TokenizeStateSawBar:
                 switch (c) {
                     case '=':
                         set_token_id(&t, t.cur_tok, TokenIdBitOrEq);
+                        end_token(&t);
+                        t.state = TokenizeStateStart;
+                        break;
+                    case '|':
+                        set_token_id(&t, t.cur_tok, TokenIdBarBar);
+                        t.state = TokenizeStateSawBarBar;
+                        break;
+                    default:
+                        t.pos -= 1;
+                        end_token(&t);
+                        t.state = TokenizeStateStart;
+                        continue;
+                }
+                break;
+            case TokenizeStateSawBarBar:
+                switch (c) {
+                    case '=':
+                        set_token_id(&t, t.cur_tok, TokenIdBarBarEq);
                         end_token(&t);
                         t.state = TokenizeStateStart;
                         break;
@@ -865,7 +924,6 @@ void tokenize(Buf *buf, Tokenization *out) {
                         t.state = TokenizeStateStart;
                         continue;
                 }
-                break;
             case TokenizeStateSawSlash:
                 switch (c) {
                     case '/':
@@ -890,7 +948,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                         t.state = TokenizeStateLineString;
                         break;
                     default:
-                        tokenize_error(&t, "invalid character: '%c'", c);
+                        invalid_char_error(&t, c);
                         break;
                 }
                 break;
@@ -919,7 +977,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                         break;
                     case '\\':
                         if (t.cur_tok->data.str_lit.is_c_str) {
-                            tokenize_error(&t, "invalid character: '%c'", c);
+                            invalid_char_error(&t, c);
                         }
                         t.state = TokenizeStateLineStringContinue;
                         break;
@@ -949,7 +1007,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                         buf_append_char(&t.cur_tok->data.str_lit.str, '\n');
                         break;
                     default:
-                        tokenize_error(&t, "invalid character: '%c'", c);
+                        invalid_char_error(&t, c);
                         break;
                 }
                 break;
@@ -1073,7 +1131,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                         handle_string_escape(&t, '\"');
                         break;
                     default:
-                        tokenize_error(&t, "invalid character: '%c'", c);
+                        invalid_char_error(&t, c);
                 }
                 break;
             case TokenizeStateCharCode:
@@ -1147,7 +1205,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                         t.state = TokenizeStateStart;
                         break;
                     default:
-                        tokenize_error(&t, "invalid character: '%c'", c);
+                        invalid_char_error(&t, c);
                 }
                 break;
             case TokenizeStateZero:
@@ -1189,7 +1247,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                     uint32_t digit_value = get_digit_value(c);
                     if (digit_value >= t.radix) {
                         if (is_symbol_char(c)) {
-                            tokenize_error(&t, "invalid character: '%c'", c);
+                            invalid_char_error(&t, c);
                         }
                         // not my char
                         t.pos -= 1;
@@ -1233,7 +1291,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                     uint32_t digit_value = get_digit_value(c);
                     if (digit_value >= t.radix) {
                         if (is_symbol_char(c)) {
-                            tokenize_error(&t, "invalid character: '%c'", c);
+                            invalid_char_error(&t, c);
                         }
                         // not my char
                         t.pos -= 1;
@@ -1282,7 +1340,7 @@ void tokenize(Buf *buf, Tokenization *out) {
                     uint32_t digit_value = get_digit_value(c);
                     if (digit_value >= t.radix) {
                         if (is_symbol_char(c)) {
-                            tokenize_error(&t, "invalid character: '%c'", c);
+                            invalid_char_error(&t, c);
                         }
                         // not my char
                         t.pos -= 1;
@@ -1392,7 +1450,7 @@ void tokenize(Buf *buf, Tokenization *out) {
         case TokenizeStateSawDash:
         case TokenizeStateSawAmpersand:
         case TokenizeStateSawCaret:
-        case TokenizeStateSawPipe:
+        case TokenizeStateSawBar:
         case TokenizeStateSawEq:
         case TokenizeStateSawBang:
         case TokenizeStateSawLessThan:
@@ -1407,6 +1465,7 @@ void tokenize(Buf *buf, Tokenization *out) {
         case TokenizeStateSawMinusPercent:
         case TokenizeStateLineString:
         case TokenizeStateLineStringEnd:
+        case TokenizeStateSawBarBar:
             end_token(&t);
             break;
         case TokenizeStateSawDotDot:
@@ -1439,6 +1498,7 @@ const char * token_name(TokenId id) {
         case TokenIdArrow: return "->";
         case TokenIdAtSign: return "@";
         case TokenIdBang: return "!";
+        case TokenIdBarBar: return "||";
         case TokenIdBinOr: return "|";
         case TokenIdBinXor: return "^";
         case TokenIdBitAndEq: return "&=";
@@ -1468,24 +1528,29 @@ const char * token_name(TokenId id) {
         case TokenIdFatArrow: return "=>";
         case TokenIdFloatLiteral: return "FloatLiteral";
         case TokenIdIntLiteral: return "IntLiteral";
+        case TokenIdKeywordAsync: return "async";
+        case TokenIdKeywordAwait: return "await";
+        case TokenIdKeywordResume: return "resume";
+        case TokenIdKeywordSuspend: return "suspend";
+        case TokenIdKeywordCancel: return "cancel";
         case TokenIdKeywordAlign: return "align";
         case TokenIdKeywordAnd: return "and";
         case TokenIdKeywordAsm: return "asm";
         case TokenIdKeywordBreak: return "break";
-        case TokenIdKeywordColdCC: return "coldcc";
+        case TokenIdKeywordCatch: return "catch";
         case TokenIdKeywordCompTime: return "comptime";
         case TokenIdKeywordConst: return "const";
         case TokenIdKeywordContinue: return "continue";
         case TokenIdKeywordDefer: return "defer";
         case TokenIdKeywordElse: return "else";
         case TokenIdKeywordEnum: return "enum";
+        case TokenIdKeywordErrdefer: return "errdefer";
         case TokenIdKeywordError: return "error";
         case TokenIdKeywordExport: return "export";
         case TokenIdKeywordExtern: return "extern";
         case TokenIdKeywordFalse: return "false";
         case TokenIdKeywordFn: return "fn";
         case TokenIdKeywordFor: return "for";
-        case TokenIdKeywordGoto: return "goto";
         case TokenIdKeywordIf: return "if";
         case TokenIdKeywordInline: return "inline";
         case TokenIdKeywordNakedCC: return "nakedcc";
@@ -1495,12 +1560,14 @@ const char * token_name(TokenId id) {
         case TokenIdKeywordPacked: return "packed";
         case TokenIdKeywordPub: return "pub";
         case TokenIdKeywordReturn: return "return";
+        case TokenIdKeywordSection: return "section";
         case TokenIdKeywordStdcallCC: return "stdcallcc";
         case TokenIdKeywordStruct: return "struct";
         case TokenIdKeywordSwitch: return "switch";
         case TokenIdKeywordTest: return "test";
         case TokenIdKeywordThis: return "this";
         case TokenIdKeywordTrue: return "true";
+        case TokenIdKeywordTry: return "try";
         case TokenIdKeywordUndefined: return "undefined";
         case TokenIdKeywordUnion: return "union";
         case TokenIdKeywordUnreachable: return "unreachable";
@@ -1520,7 +1587,6 @@ const char * token_name(TokenId id) {
         case TokenIdNumberSign: return "#";
         case TokenIdPercent: return "%";
         case TokenIdPercentDot: return "%.";
-        case TokenIdPercentPercent: return "%%";
         case TokenIdPlus: return "+";
         case TokenIdPlusEq: return "+=";
         case TokenIdPlusPercent: return "+%";
@@ -1539,6 +1605,7 @@ const char * token_name(TokenId id) {
         case TokenIdTimesEq: return "*=";
         case TokenIdTimesPercent: return "*%";
         case TokenIdTimesPercentEq: return "*%=";
+        case TokenIdBarBarEq: return "||=";
     }
     return "(invalid token)";
 }

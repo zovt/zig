@@ -1,88 +1,108 @@
 pub const ERROR = @import("error.zig");
 
 pub extern "advapi32" stdcallcc fn CryptAcquireContextA(phProv: &HCRYPTPROV, pszContainer: ?LPCSTR,
-    pszProvider: ?LPCSTR, dwProvType: DWORD, dwFlags: DWORD) -> BOOL;
+    pszProvider: ?LPCSTR, dwProvType: DWORD, dwFlags: DWORD) BOOL;
 
-pub extern "advapi32" stdcallcc fn CryptReleaseContext(hProv: HCRYPTPROV, dwFlags: DWORD) -> BOOL;
+pub extern "advapi32" stdcallcc fn CryptReleaseContext(hProv: HCRYPTPROV, dwFlags: DWORD) BOOL;
 
-pub extern "advapi32" stdcallcc fn CryptGenRandom(hProv: HCRYPTPROV, dwLen: DWORD, pbBuffer: &BYTE) -> BOOL;
+pub extern "advapi32" stdcallcc fn CryptGenRandom(hProv: HCRYPTPROV, dwLen: DWORD, pbBuffer: &BYTE) BOOL;
 
 
-pub extern "kernel32" stdcallcc fn CloseHandle(hObject: HANDLE) -> BOOL;
+pub extern "kernel32" stdcallcc fn CloseHandle(hObject: HANDLE) BOOL;
 
 pub extern "kernel32" stdcallcc fn CreateDirectoryA(lpPathName: LPCSTR,
-    lpSecurityAttributes: ?&SECURITY_ATTRIBUTES) -> BOOL;
+    lpSecurityAttributes: ?&SECURITY_ATTRIBUTES) BOOL;
 
 pub extern "kernel32" stdcallcc fn CreateFileA(lpFileName: LPCSTR, dwDesiredAccess: DWORD,
     dwShareMode: DWORD, lpSecurityAttributes: ?LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD,
-        dwFlagsAndAttributes: DWORD, hTemplateFile: ?HANDLE) -> HANDLE;
+        dwFlagsAndAttributes: DWORD, hTemplateFile: ?HANDLE) HANDLE;
 
 pub extern "kernel32" stdcallcc fn CreatePipe(hReadPipe: &HANDLE, hWritePipe: &HANDLE,
-    lpPipeAttributes: &const SECURITY_ATTRIBUTES, nSize: DWORD) -> BOOL;
+    lpPipeAttributes: &const SECURITY_ATTRIBUTES, nSize: DWORD) BOOL;
 
 pub extern "kernel32" stdcallcc fn CreateProcessA(lpApplicationName: ?LPCSTR, lpCommandLine: LPSTR,
     lpProcessAttributes: ?&SECURITY_ATTRIBUTES, lpThreadAttributes: ?&SECURITY_ATTRIBUTES, bInheritHandles: BOOL,
-    dwCreationFlags: DWORD, lpEnvironment: ?LPVOID, lpCurrentDirectory: ?LPCSTR, lpStartupInfo: &STARTUPINFOA,
-    lpProcessInformation: &PROCESS_INFORMATION) -> BOOL;
+    dwCreationFlags: DWORD, lpEnvironment: ?&c_void, lpCurrentDirectory: ?LPCSTR, lpStartupInfo: &STARTUPINFOA,
+    lpProcessInformation: &PROCESS_INFORMATION) BOOL;
 
 pub extern "kernel32" stdcallcc fn CreateSymbolicLinkA(lpSymlinkFileName: LPCSTR, lpTargetFileName: LPCSTR,
-    dwFlags: DWORD) -> BOOLEAN;
+    dwFlags: DWORD) BOOLEAN;
 
-pub extern "kernel32" stdcallcc fn DeleteFileA(lpFileName: LPCSTR) -> BOOL;
+pub extern "kernel32" stdcallcc fn DeleteFileA(lpFileName: LPCSTR) BOOL;
 
-pub extern "kernel32" stdcallcc fn ExitProcess(exit_code: UINT) -> noreturn;
+pub extern "kernel32" stdcallcc fn ExitProcess(exit_code: UINT) noreturn;
 
-pub extern "kernel32" stdcallcc fn FreeEnvironmentStringsA(penv: LPCH) -> BOOL;
+pub extern "kernel32" stdcallcc fn FreeEnvironmentStringsA(penv: LPCH) BOOL;
 
-pub extern "kernel32" stdcallcc fn GetCommandLineA() -> LPSTR;
+pub extern "kernel32" stdcallcc fn GetCommandLineA() LPSTR;
 
-pub extern "kernel32" stdcallcc fn GetConsoleMode(in_hConsoleHandle: HANDLE, out_lpMode: &DWORD) -> BOOL;
+pub extern "kernel32" stdcallcc fn GetConsoleMode(in_hConsoleHandle: HANDLE, out_lpMode: &DWORD) BOOL;
 
-pub extern "kernel32" stdcallcc fn GetCurrentDirectoryA(nBufferLength: WORD, lpBuffer: ?LPSTR) -> DWORD;
+pub extern "kernel32" stdcallcc fn GetCurrentDirectoryA(nBufferLength: WORD, lpBuffer: ?LPSTR) DWORD;
 
-pub extern "kernel32" stdcallcc fn GetEnvironmentStringsA() -> ?LPCH;
+pub extern "kernel32" stdcallcc fn GetEnvironmentStringsA() ?LPCH;
 
-pub extern "kernel32" stdcallcc fn GetEnvironmentVariableA(lpName: LPCSTR, lpBuffer: LPSTR, nSize: DWORD) -> DWORD;
+pub extern "kernel32" stdcallcc fn GetEnvironmentVariableA(lpName: LPCSTR, lpBuffer: LPSTR, nSize: DWORD) DWORD;
 
-pub extern "kernel32" stdcallcc fn GetExitCodeProcess(hProcess: HANDLE, lpExitCode: &DWORD) -> BOOL;
+pub extern "kernel32" stdcallcc fn GetExitCodeProcess(hProcess: HANDLE, lpExitCode: &DWORD) BOOL;
 
-pub extern "kernel32" stdcallcc fn GetLastError() -> DWORD;
+pub extern "kernel32" stdcallcc fn GetFileSizeEx(hFile: HANDLE, lpFileSize: &LARGE_INTEGER) BOOL;
+
+pub extern "kernel32" stdcallcc fn GetModuleFileNameA(hModule: ?HMODULE, lpFilename: LPSTR, nSize: DWORD) DWORD;
+
+pub extern "kernel32" stdcallcc fn GetLastError() DWORD;
 
 pub extern "kernel32" stdcallcc fn GetFileInformationByHandleEx(in_hFile: HANDLE,
     in_FileInformationClass: FILE_INFO_BY_HANDLE_CLASS, out_lpFileInformation: &c_void,
-    in_dwBufferSize: DWORD) -> BOOL;
+    in_dwBufferSize: DWORD) BOOL;
 
 pub extern "kernel32" stdcallcc fn GetFinalPathNameByHandleA(hFile: HANDLE, lpszFilePath: LPSTR,
-  cchFilePath: DWORD, dwFlags: DWORD) -> DWORD;
+  cchFilePath: DWORD, dwFlags: DWORD) DWORD;
 
-pub extern "kernel32" stdcallcc fn GetProcessHeap() -> ?HANDLE;
+pub extern "kernel32" stdcallcc fn GetProcessHeap() ?HANDLE;
 
-pub extern "kernel32" stdcallcc fn GetStdHandle(in_nStdHandle: DWORD) -> ?HANDLE;
+pub extern "kernel32" stdcallcc fn HeapCreate(flOptions: DWORD, dwInitialSize: SIZE_T, dwMaximumSize: SIZE_T) ?HANDLE;
+pub extern "kernel32" stdcallcc fn HeapDestroy(hHeap: HANDLE) BOOL;
+pub extern "kernel32" stdcallcc fn HeapReAlloc(hHeap: HANDLE, dwFlags: DWORD, lpMem: &c_void, dwBytes: SIZE_T) ?&c_void;
+pub extern "kernel32" stdcallcc fn HeapSize(hHeap: HANDLE, dwFlags: DWORD, lpMem: &const c_void) SIZE_T;
+pub extern "kernel32" stdcallcc fn HeapValidate(hHeap: HANDLE, dwFlags: DWORD, lpMem: &const c_void) BOOL;
+pub extern "kernel32" stdcallcc fn HeapCompact(hHeap: HANDLE, dwFlags: DWORD) SIZE_T;
+pub extern "kernel32" stdcallcc fn HeapSummary(hHeap: HANDLE, dwFlags: DWORD, lpSummary: LPHEAP_SUMMARY) BOOL;
 
-pub extern "kernel32" stdcallcc fn HeapAlloc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) -> ?LPVOID;
+pub extern "kernel32" stdcallcc fn GetStdHandle(in_nStdHandle: DWORD) ?HANDLE;
 
-pub extern "kernel32" stdcallcc fn HeapFree(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL;
+pub extern "kernel32" stdcallcc fn HeapAlloc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) ?&c_void;
+
+pub extern "kernel32" stdcallcc fn HeapFree(hHeap: HANDLE, dwFlags: DWORD, lpMem: &c_void) BOOL;
 
 pub extern "kernel32" stdcallcc fn MoveFileExA(lpExistingFileName: LPCSTR, lpNewFileName: LPCSTR,
-    dwFlags: DWORD) -> BOOL;
+    dwFlags: DWORD) BOOL;
 
-pub extern "kernel32" stdcallcc fn ReadFile(in_hFile: HANDLE, out_lpBuffer: LPVOID,
+pub extern "kernel32" stdcallcc fn ReadFile(in_hFile: HANDLE, out_lpBuffer: &c_void,
     in_nNumberOfBytesToRead: DWORD, out_lpNumberOfBytesRead: &DWORD,
-    in_out_lpOverlapped: ?&OVERLAPPED) -> BOOL;
+    in_out_lpOverlapped: ?&OVERLAPPED) BOOL;
 
-pub extern "kernel32" stdcallcc fn SetHandleInformation(hObject: HANDLE, dwMask: DWORD, dwFlags: DWORD) -> BOOL;
+pub extern "kernel32" stdcallcc fn SetFilePointerEx(in_fFile: HANDLE, in_liDistanceToMove: LARGE_INTEGER, 
+    out_opt_ldNewFilePointer: ?&LARGE_INTEGER, in_dwMoveMethod: DWORD) BOOL;
 
-pub extern "kernel32" stdcallcc fn Sleep(dwMilliseconds: DWORD);
+pub extern "kernel32" stdcallcc fn SetHandleInformation(hObject: HANDLE, dwMask: DWORD, dwFlags: DWORD) BOOL;
 
-pub extern "kernel32" stdcallcc fn TerminateProcess(hProcess: HANDLE, uExitCode: UINT) -> BOOL;
+pub extern "kernel32" stdcallcc fn Sleep(dwMilliseconds: DWORD) void;
 
-pub extern "kernel32" stdcallcc fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
+pub extern "kernel32" stdcallcc fn TerminateProcess(hProcess: HANDLE, uExitCode: UINT) BOOL;
+
+pub extern "kernel32" stdcallcc fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) DWORD;
 
 pub extern "kernel32" stdcallcc fn WriteFile(in_hFile: HANDLE, in_lpBuffer: &const c_void,
     in_nNumberOfBytesToWrite: DWORD, out_lpNumberOfBytesWritten: ?&DWORD,
-    in_out_lpOverlapped: ?&OVERLAPPED) -> BOOL;
+    in_out_lpOverlapped: ?&OVERLAPPED) BOOL;
 
-pub extern "user32" stdcallcc fn MessageBoxA(hWnd: ?HANDLE, lpText: ?LPCTSTR, lpCaption: ?LPCTSTR, uType: UINT) -> c_int;
+//TODO: call unicode versions instead of relying on ANSI code page
+pub extern "kernel32" stdcallcc fn LoadLibraryA(lpLibFileName: LPCSTR) ?HMODULE;
+
+pub extern "kernel32" stdcallcc fn FreeLibrary(hModule: HMODULE) BOOL;   
+
+pub extern "user32" stdcallcc fn MessageBoxA(hWnd: ?HANDLE, lpText: ?LPCTSTR, lpCaption: ?LPCTSTR, uType: UINT) c_int;
 
 pub const PROV_RSA_FULL = 1;
 
@@ -95,6 +115,7 @@ pub const FLOAT = f32;
 pub const HANDLE = &c_void;
 pub const HCRYPTPROV = ULONG_PTR;
 pub const HINSTANCE = &@OpaqueType();
+pub const HMODULE = &@OpaqueType();
 pub const INT = c_int;
 pub const LPBYTE = &BYTE;
 pub const LPCH = &CHAR;
@@ -115,6 +136,7 @@ pub const ULONG_PTR = usize;
 pub const UNICODE = false;
 pub const WCHAR = u16;
 pub const WORD = u16;
+pub const LARGE_INTEGER = i64;
 
 pub const TRUE = 1;
 pub const FALSE = 0;
@@ -187,7 +209,7 @@ pub const VOLUME_NAME_NT = 0x2;
 
 pub const SECURITY_ATTRIBUTES = extern struct {
     nLength: DWORD,
-    lpSecurityDescriptor: ?LPVOID,
+    lpSecurityDescriptor: ?&c_void,
     bInheritHandle: BOOL,
 };
 pub const PSECURITY_ATTRIBUTES = &SECURITY_ATTRIBUTES;
@@ -278,3 +300,11 @@ pub const MOVEFILE_DELAY_UNTIL_REBOOT = 4;
 pub const MOVEFILE_FAIL_IF_NOT_TRACKABLE = 32;
 pub const MOVEFILE_REPLACE_EXISTING = 1;
 pub const MOVEFILE_WRITE_THROUGH = 8;
+
+pub const FILE_BEGIN = 0;
+pub const FILE_CURRENT = 1;
+pub const FILE_END = 2;
+
+pub const HEAP_CREATE_ENABLE_EXECUTE = 0x00040000;
+pub const HEAP_GENERATE_EXCEPTIONS = 0x00000004;
+pub const HEAP_NO_SERIALIZE = 0x00000001;

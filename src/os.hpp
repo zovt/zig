@@ -11,6 +11,7 @@
 #include "list.hpp"
 #include "buffer.hpp"
 #include "error.hpp"
+#include "zig_llvm.h"
 
 #include <stdio.h>
 #include <inttypes.h>
@@ -20,6 +21,7 @@ enum TermColor {
     TermColorGreen,
     TermColorCyan,
     TermColorWhite,
+    TermColorBold,
     TermColorReset,
 };
 
@@ -74,6 +76,19 @@ double os_get_time(void);
 bool os_is_sep(uint8_t c);
 
 int os_self_exe_path(Buf *out_path);
+
+struct ZigWindowsSDK {
+    Buf path10;
+    Buf version10;
+    Buf path81;
+    Buf version81;
+};
+
+int os_find_windows_sdk(ZigWindowsSDK **out_sdk);
+int os_get_win32_vcruntime_path(Buf *output_buf, ZigLLVM_ArchType platform_type);
+int os_get_win32_ucrt_include_path(ZigWindowsSDK *sdk, Buf *output_buf);
+int os_get_win32_ucrt_lib_path(ZigWindowsSDK *sdk, Buf *output_buf, ZigLLVM_ArchType platform_type);
+int os_get_win32_kern32_path(ZigWindowsSDK *sdk, Buf *output_buf, ZigLLVM_ArchType platform_type);
 
 #if defined(__APPLE__)
 #define ZIG_OS_DARWIN

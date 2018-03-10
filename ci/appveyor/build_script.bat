@@ -7,13 +7,16 @@ SET "PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%"
 SET "MSYSTEM=MINGW64"
 SET "APPVEYOR_CACHE_ENTRY_ZIP_ARGS=-m0=Copy"
 
-bash -lc "cd ${APPVEYOR_BUILD_FOLDER} && if [ -s ""llvm+clang-5.0.0-win64-msvc-release.tar.xz"" ]; then echo 'skipping LLVM download'; else wget 'https://s3.amazonaws.com/superjoe/temp/llvm%%2bclang-5.0.0-win64-msvc-release.tar.xz'; fi && tar xf llvm+clang-5.0.0-win64-msvc-release.tar.xz" || exit /b
+bash -lc "cd ${APPVEYOR_BUILD_FOLDER} && if [ -s ""llvm+clang-6.0.0-win64-msvc-release.tar.xz"" ]; then echo 'skipping LLVM download'; else wget 'https://s3.amazonaws.com/ziglang.org/deps/llvm%%2bclang-6.0.0-win64-msvc-release.tar.xz'; fi && tar xf llvm+clang-6.0.0-win64-msvc-release.tar.xz" || exit /b
 
 
 SET "PATH=%PREVPATH%"
 SET "MSYSTEM=%PREVMSYSTEM%"
 SET "ZIGBUILDDIR=%APPVEYOR_BUILD_FOLDER%\build-msvc-release"
-SET "ZIGPREFIXPATH=%APPVEYOR_BUILD_FOLDER%\llvm+clang-5.0.0-win64-msvc-release"
+SET "ZIGPREFIXPATH=%APPVEYOR_BUILD_FOLDER%\llvm+clang-6.0.0-win64-msvc-release"
+
+call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64
+call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64
 
 mkdir %ZIGBUILDDIR%
 cd %ZIGBUILDDIR%
@@ -22,16 +25,4 @@ msbuild /p:Configuration=Release INSTALL.vcxproj || exit /b
 
 bin\zig.exe build --build-file ..\build.zig test || exit /b
 
-@echo "MSVC build succeeded, proceeding with MinGW build"
-cd %APPVEYOR_BUILD_FOLDER%
-SET "PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%"
-SET "MSYSTEM=MINGW64"
-
-bash -lc "pacman -Syu --needed --noconfirm"
-bash -lc "pacman -Su --needed --noconfirm"
-
-bash -lc "pacman -S --needed --noconfirm make mingw64/mingw-w64-x86_64-make mingw64/mingw-w64-x86_64-cmake mingw64/mingw-w64-x86_64-clang mingw64/mingw-w64-x86_64-llvm mingw64/mingw-w64-x86_64-lld mingw64/mingw-w64-x86_64-gcc"
-
-bash -lc "cd ${APPVEYOR_BUILD_FOLDER} && mkdir build && cd build && cmake .. -G""MSYS Makefiles"" -DCMAKE_INSTALL_PREFIX=$(pwd) -DZIG_LIBC_LIB_DIR=$(dirname $(cc -print-file-name=crt1.o)) -DZIG_LIBC_INCLUDE_DIR=$(echo -n | cc -E -x c - -v 2>&1 | grep -B1 ""End of search list."" | head -n1 | cut -c 2- | sed ""s/ .*//"") -DZIG_LIBC_STATIC_LIB_DIR=$(dirname $(cc -print-file-name=crtbegin.o)) && make && make install"
-
-@echo "MinGW build successful"
+@echo "MSVC build succeeded"
