@@ -242,13 +242,13 @@ fn printSourceAtAddress(debug_info: &ElfStackTrace, out_stream: var, address: us
     }
 }
 
-pub fn openSelfDebugInfo(allocator: &mem.Allocator) !&ElfStackTrace {
+pub fn openDebugInfo(allocator: &mem.Allocator, elf_file: &io.SeekableStream) !&ElfStackTrace {
     switch (builtin.object_format) {
         builtin.ObjectFormat.elf => {
             const st = try allocator.create(ElfStackTrace);
             errdefer allocator.destroy(st);
             *st = ElfStackTrace {
-                .self_exe_file = undefined,
+                .self_exe_file = elf_file,
                 .elf = undefined,
                 .debug_info = undefined,
                 .debug_abbrev = undefined,
@@ -258,10 +258,8 @@ pub fn openSelfDebugInfo(allocator: &mem.Allocator) !&ElfStackTrace {
                 .abbrev_table_list = ArrayList(AbbrevTableHeader).init(allocator),
                 .compile_unit_list = ArrayList(CompileUnit).init(allocator),
             };
-            st.self_exe_file = try os.openSelfExe();
-            errdefer st.self_exe_file.close();
 
-            try st.elf.openFile(allocator, &st.self_exe_file);
+            try st.elf.openFile(allocator, st.self_exe_file);
             errdefer st.elf.close();
 
             st.debug_info = (try st.elf.findSection(".debug_info")) ?? return error.MissingDebugInfo;
@@ -295,6 +293,17 @@ pub fn openSelfDebugInfo(allocator: &mem.Allocator) !&ElfStackTrace {
             return error.UnknownObjectFormat;
         },
     }
+}
+
+pub fn openSelfDebugInfo(allocator: &mem.Allocator) !&ElfStackTrace {
+    const self_exe_file = try allocator.create(os.File);
+    *self_exe_file = try os.openSelfExe();
+    errdefer self_exe_file.close();
+
+    const file_seekable_stream = try allocator.create(io.FileSeekableStream);
+    *file_seekable_stream = io.FileSeekableStream.init(self_exe_file);
+
+    return openDebugInfo(allocator, &file_seekable_stream.stream);
 }
 
 fn printLineFromFile(allocator: &mem.Allocator, out_stream: var, line_info: &const LineInfo) !void {
@@ -339,7 +348,7 @@ pub const ElfStackTrace = switch (builtin.os) {
         }
     },
     else => struct {
-        self_exe_file: os.File,
+        self_exe_file: &io.SeekableStream,
         elf: elf.Elf,
         debug_info: &elf.SectionHeader,
         debug_abbrev: &elf.SectionHeader,
@@ -354,9 +363,7 @@ pub const ElfStackTrace = switch (builtin.os) {
         }
 
         pub fn readString(self: &ElfStackTrace) ![]u8 {
-            var in_file_stream = io.FileInStream.init(&self.self_exe_file);
-            const in_stream = &in_file_stream.stream;
-            return readStringRaw(self.allocator(), in_stream);
+            return readStringRaw(self.allocator(), &self.self_exe_file.in);
         }
 
         pub fn close(self: &ElfStackTrace) void {
@@ -587,7 +594,7 @@ fn readStringRaw(allocator: &mem.Allocator, in_stream: var) ![]u8 {
 
 fn getString(st: &ElfStackTrace, offset: u64) ![]u8 {
     const pos = st.debug_str.offset + offset;
-    try st.self_exe_file.seekTo(pos);
+    try st.self_exe_file.seekTo(try math.cast(usize, pos));
     return st.readString();
 }
 
@@ -626,8 +633,8 @@ fn parseFormValueTargetAddrSize(in_stream: var) !u64 {
     else unreachable;
 }
 
-fn parseFormValueRefLen(allocator: &mem.Allocator, in_stream: var, size: usize) !FormValue {
-    const buf = try readAllocBytes(allocator, in_stream, size);
+fn parseFormValueRefLen(allocator: &mem.Allocator, in_stream: var, size: u64) !FormValue {
+    const buf = try readAllocBytes(allocator, in_stream, try math.cast(usize, size));
     return FormValue { .Ref = buf };
 }
 
@@ -644,6 +651,8 @@ const ParseFormValueError = error {
     InvalidDebugInfo,
     EndOfFile,
     OutOfMemory,
+    ReadFailure,
+    Overflow,
 };
 
 fn parseFormValue(allocator: &mem.Allocator, in_stream: var, form_id: u64, is_64: bool)
@@ -656,7 +665,7 @@ fn parseFormValue(allocator: &mem.Allocator, in_stream: var, form_id: u64, is_64
         DW.FORM_block4 => parseFormValueBlock(allocator, in_stream, 4),
         DW.FORM_block => x: {
             const block_len = try readULeb128(in_stream);
-            return parseFormValueBlockLen(allocator, in_stream, block_len);
+            return parseFormValueBlockLen(allocator, in_stream, try math.cast(usize, block_len));
         },
         DW.FORM_data1 => parseFormValueConstant(allocator, in_stream, false, 1),
         DW.FORM_data2 => parseFormValueConstant(allocator, in_stream, false, 2),
@@ -665,11 +674,11 @@ fn parseFormValue(allocator: &mem.Allocator, in_stream: var, form_id: u64, is_64
         DW.FORM_udata, DW.FORM_sdata => {
             const block_len = try readULeb128(in_stream);
             const signed = form_id == DW.FORM_sdata;
-            return parseFormValueConstant(allocator, in_stream, signed, block_len);
+            return parseFormValueConstant(allocator, in_stream, signed, try math.cast(usize, block_len));
         },
         DW.FORM_exprloc => {
             const size = try readULeb128(in_stream);
-            const buf = try readAllocBytes(allocator, in_stream, size);
+            const buf = try readAllocBytes(allocator, in_stream, try math.cast(usize, size));
             return FormValue { .ExprLoc = buf };
         },
         DW.FORM_flag => FormValue { .Flag = (try in_stream.readByte()) != 0 },
@@ -700,8 +709,7 @@ fn parseFormValue(allocator: &mem.Allocator, in_stream: var, form_id: u64, is_64
 
 fn parseAbbrevTable(st: &ElfStackTrace) !AbbrevTable {
     const in_file = &st.self_exe_file;
-    var in_file_stream = io.FileInStream.init(in_file);
-    const in_stream = &in_file_stream.stream;
+    const in_stream = &st.self_exe_file.in;
     var result = AbbrevTable.init(st.allocator());
     while (true) {
         const abbrev_code = try readULeb128(in_stream);
@@ -736,7 +744,7 @@ fn getAbbrevTable(st: &ElfStackTrace, abbrev_offset: u64) !&const AbbrevTable {
             return &header.table;
         }
     }
-    try st.self_exe_file.seekTo(st.debug_abbrev.offset + abbrev_offset);
+    try st.self_exe_file.seekTo(try math.cast(usize, st.debug_abbrev.offset + abbrev_offset));
     try st.abbrev_table_list.append(AbbrevTableHeader {
         .offset = abbrev_offset,
         .table = try parseAbbrevTable(st),
@@ -753,9 +761,7 @@ fn getAbbrevTableEntry(abbrev_table: &const AbbrevTable, abbrev_code: u64) ?&con
 }
 
 fn parseDie(st: &ElfStackTrace, abbrev_table: &const AbbrevTable, is_64: bool) !Die {
-    const in_file = &st.self_exe_file;
-    var in_file_stream = io.FileInStream.init(in_file);
-    const in_stream = &in_file_stream.stream;
+    const in_stream = &st.self_exe_file.in;
     const abbrev_code = try readULeb128(in_stream);
     const table_entry = getAbbrevTableEntry(abbrev_table, abbrev_code) ?? return error.InvalidDebugInfo;
 
@@ -777,16 +783,15 @@ fn parseDie(st: &ElfStackTrace, abbrev_table: &const AbbrevTable, is_64: bool) !
 fn getLineNumberInfo(st: &ElfStackTrace, compile_unit: &const CompileUnit, target_address: usize) !LineInfo {
     const compile_unit_cwd = try compile_unit.die.getAttrString(st, DW.AT_comp_dir);
 
-    const in_file = &st.self_exe_file;
+    const in_file = st.self_exe_file;
     const debug_line_end = st.debug_line.offset + st.debug_line.size;
     var this_offset = st.debug_line.offset;
     var this_index: usize = 0;
 
-    var in_file_stream = io.FileInStream.init(in_file);
-    const in_stream = &in_file_stream.stream;
+    const in_stream = &st.self_exe_file.in;
 
     while (this_offset < debug_line_end) : (this_index += 1) {
-        try in_file.seekTo(this_offset);
+        try in_file.seekTo(try math.cast(usize, this_offset));
 
         var is_64: bool = undefined;
         const unit_length = try readInitialLength(@typeOf(in_stream.readFn).ReturnType.ErrorSet, in_stream, &is_64);
@@ -852,13 +857,13 @@ fn getLineNumberInfo(st: &ElfStackTrace, compile_unit: &const CompileUnit, targe
             const len_bytes = try readULeb128(in_stream);
             try file_entries.append(FileEntry {
                 .file_name = file_name,
-                .dir_index = dir_index,
-                .mtime = mtime,
-                .len_bytes = len_bytes,
+                .dir_index = try math.cast(usize, dir_index),
+                .mtime = try math.cast(usize, mtime),
+                .len_bytes = try math.cast(usize, len_bytes),
             });
         }
 
-        try in_file.seekTo(prog_start_offset);
+        try in_file.seekTo(try math.cast(usize, prog_start_offset));
 
         while (true) {
             const opcode = try in_stream.readByte();
@@ -886,9 +891,9 @@ fn getLineNumberInfo(st: &ElfStackTrace, compile_unit: &const CompileUnit, targe
                         const len_bytes = try readULeb128(in_stream);
                         try file_entries.append(FileEntry {
                             .file_name = file_name,
-                            .dir_index = dir_index,
-                            .mtime = mtime,
-                            .len_bytes = len_bytes,
+                            .dir_index = try math.cast(usize, dir_index),
+                            .mtime = try math.cast(usize, mtime),
+                            .len_bytes = try math.cast(usize, len_bytes),
                         });
                     },
                     else => {
@@ -913,19 +918,19 @@ fn getLineNumberInfo(st: &ElfStackTrace, compile_unit: &const CompileUnit, targe
                     },
                     DW.LNS_advance_pc => {
                         const arg = try readULeb128(in_stream);
-                        prog.address += arg * minimum_instruction_length;
+                        prog.address += (try math.cast(usize, arg)) * minimum_instruction_length;
                     },
                     DW.LNS_advance_line => {
                         const arg = try readILeb128(in_stream);
-                        prog.line += arg;
+                        prog.line += try math.cast(isize, arg);
                     },
                     DW.LNS_set_file => {
                         const arg = try readULeb128(in_stream);
-                        prog.file = arg;
+                        prog.file = try math.cast(usize, arg);
                     },
                     DW.LNS_set_column => {
                         const arg = try readULeb128(in_stream);
-                        prog.column = arg;
+                        prog.column = try math.cast(usize, arg);
                     },
                     DW.LNS_negate_stmt => {
                         prog.is_stmt = !prog.is_stmt;
@@ -964,11 +969,11 @@ fn scanAllCompileUnits(st: &ElfStackTrace) !void {
     var this_unit_offset = st.debug_info.offset;
     var cu_index: usize = 0;
 
-    var in_file_stream = io.FileInStream.init(&st.self_exe_file);
-    const in_stream = &in_file_stream.stream;
+    const in_stream = &st.self_exe_file.in;
 
     while (this_unit_offset < debug_info_end) {
-        try st.self_exe_file.seekTo(this_unit_offset);
+        // TODO handle 32 vs 64 better here
+        try st.self_exe_file.seekTo(usize(this_unit_offset));
 
         var is_64: bool = undefined;
         const unit_length = try readInitialLength(@typeOf(in_stream.readFn).ReturnType.ErrorSet, in_stream, &is_64);
@@ -1036,8 +1041,7 @@ fn scanAllCompileUnits(st: &ElfStackTrace) !void {
 }
 
 fn findCompileUnit(st: &ElfStackTrace, target_address: u64) !&const CompileUnit {
-    var in_file_stream = io.FileInStream.init(&st.self_exe_file);
-    const in_stream = &in_file_stream.stream;
+    const in_stream = &st.self_exe_file.in;
     for (st.compile_unit_list.toSlice()) |*compile_unit| {
         if (compile_unit.pc_range) |range| {
             if (target_address >= range.start and target_address < range.end)
@@ -1046,7 +1050,7 @@ fn findCompileUnit(st: &ElfStackTrace, target_address: u64) !&const CompileUnit 
         if (compile_unit.die.getAttrSecOffset(DW.AT_ranges)) |ranges_offset| {
             var base_address: usize = 0;
             if (st.debug_ranges) |debug_ranges| {
-                try st.self_exe_file.seekTo(debug_ranges.offset + ranges_offset);
+                try st.self_exe_file.seekTo(try math.cast(usize, debug_ranges.offset + ranges_offset));
                 while (true) {
                     const begin_addr = try in_stream.readIntLe(usize);
                     const end_addr = try in_stream.readIntLe(usize);

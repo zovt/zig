@@ -64,8 +64,7 @@ pub const SectionHeader = struct {
 };
 
 pub const Elf = struct {
-    in_file: &os.File,
-    auto_close_stream: bool,
+    in_file: &io.SeekableStream,
     is_64: bool,
     endian: builtin.Endian,
     file_type: FileType,
@@ -83,17 +82,14 @@ pub const Elf = struct {
     pub fn openPath(elf: &Elf, allocator: &mem.Allocator, path: []const u8) !void {
         try elf.prealloc_file.open(path);
         try elf.openFile(allocator, &elf.prealloc_file);
-        elf.auto_close_stream = true;
     }
 
     /// Call close when done.
-    pub fn openFile(elf: &Elf, allocator: &mem.Allocator, file: &os.File) !void {
+    pub fn openFile(elf: &Elf, allocator: &mem.Allocator, stream: &io.SeekableStream) !void {
         elf.allocator = allocator;
-        elf.in_file = file;
-        elf.auto_close_stream = false;
+        elf.in_file = stream;
 
-        var file_stream = io.FileInStream.init(elf.in_file);
-        const in = &file_stream.stream;
+        const in = &stream.in;
 
         var magic: [4]u8 = undefined;
         try in.readNoEof(magic[0..]);
@@ -179,7 +175,8 @@ pub const Elf = struct {
             return error.InvalidFormat;
         }
 
-        try elf.in_file.seekTo(elf.section_header_offset);
+        // TODO handle 32 vs 64 bit better here
+        try elf.in_file.seekTo(usize(elf.section_header_offset));
 
         elf.section_headers = try elf.allocator.alloc(SectionHeader, sh_entry_count);
         errdefer elf.allocator.free(elf.section_headers);
@@ -224,7 +221,8 @@ pub const Elf = struct {
             }
         }
 
-        elf.string_section = &elf.section_headers[elf.string_section_index];
+        // TODO handle 32 vs 64 better here
+        elf.string_section = &elf.section_headers[usize(elf.string_section_index)];
         if (elf.string_section.sh_type != SHT_STRTAB) {
             // not a string table
             return error.InvalidFormat;
@@ -233,20 +231,17 @@ pub const Elf = struct {
 
     pub fn close(elf: &Elf) void {
         elf.allocator.free(elf.section_headers);
-
-        if (elf.auto_close_stream)
-            elf.in_file.close();
     }
 
     pub fn findSection(elf: &Elf, name: []const u8) !?&SectionHeader {
-        var file_stream = io.FileInStream.init(elf.in_file);
-        const in = &file_stream.stream;
+        const in = &elf.in_file.in;
 
         section_loop: for (elf.section_headers) |*elf_section| {
             if (elf_section.sh_type == SHT_NULL) continue;
 
             const name_offset = elf.string_section.offset + elf_section.name;
-            try elf.in_file.seekTo(name_offset);
+            // TODO handle 32 vs 64 better here
+            try elf.in_file.seekTo(usize(name_offset));
 
             for (name) |expected_c| {
                 const target_c = try in.readByte();

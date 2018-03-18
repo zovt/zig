@@ -115,6 +115,7 @@ pub const Syscall = enum(usize) {
     inb          = 5,
     map          = 6,
     createThread = 7,
+    panic        = 8,
 };
 
 
@@ -124,6 +125,11 @@ pub const Syscall = enum(usize) {
 
 pub fn exit(status: i32) noreturn {
     _ = syscall1(Syscall.exit, @bitCast(usize, isize(status)));
+    unreachable;
+}
+
+pub fn panic() noreturn {
+    _ = syscall0(Syscall.panic);
     unreachable;
 }
 

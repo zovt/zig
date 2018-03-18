@@ -478,3 +478,152 @@ test "import io tests" {
     }
 }
 
+pub const SeekableStream = struct {
+    seekForwardFn: fn(self: &Self, amount: isize) SeekError!void,
+    seekToFn: fn(self: &Self, pos: usize) SeekError!void,
+    getPosFn: fn(self: &Self) GetPosError!usize,
+    getEndPosFn: fn(self: &Self) GetPosError!usize,
+    out: OutStream(WriteError),
+    in: InStream(ReadError),
+
+    pub const Self = this;
+
+    pub const SeekError = error {StreamSeekFailure};
+    pub const GetPosError = error {StreamGetPosFailure};
+    pub const WriteError = error {WriteFailure};
+    pub const ReadError = error {ReadFailure};
+
+    pub fn seekForward(self: &Self, amount: isize) SeekError!void {
+        return self.seekForwardFn(self, amount);
+    }
+
+    pub fn seekTo(self: &Self, pos: usize) SeekError!void {
+        return self.seekToFn(self, pos);
+    }
+
+    pub fn getPos(self: &Self) GetPosError!usize {
+        return self.getPosFn(self);
+    }
+
+    pub fn getEndPos(self: &Self) GetPosError!usize {
+        return self.getEndPosFn(self);
+    }
+};
+
+pub const FileSeekableStream = struct {
+    file: &File,
+    stream: SeekableStream,
+
+    pub fn init(file: &File) FileSeekableStream {
+        return FileSeekableStream {
+            .file = file,
+            .stream = SeekableStream {
+                .seekForwardFn = seekForwardFn,
+                .seekToFn = seekToFn,
+                .getPosFn = getPosFn,
+                .getEndPosFn = getEndPosFn,
+                .in = InStream(SeekableStream.ReadError) {
+                    .readFn = readFn,
+                },
+                .out = OutStream(SeekableStream.WriteError) {
+                    .writeFn = writeFn,
+                },
+            },
+        };
+    }
+
+    fn writeFn(out_stream: &OutStream(SeekableStream.WriteError), bytes: []const u8) SeekableStream.WriteError!void {
+        const seekable_stream = @fieldParentPtr(SeekableStream, "out", out_stream);
+        const self = @fieldParentPtr(FileSeekableStream, "stream", seekable_stream);
+        return self.file.write(bytes) catch return SeekableStream.WriteError.WriteFailure;
+    }
+
+    fn readFn(in_stream: &InStream(SeekableStream.ReadError), buffer: []u8) SeekableStream.ReadError!usize {
+        const seekable_stream = @fieldParentPtr(SeekableStream, "in", in_stream);
+        const self = @fieldParentPtr(FileSeekableStream, "stream", seekable_stream);
+        return self.file.read(buffer) catch return SeekableStream.ReadError.ReadFailure;
+    }
+
+    fn seekForwardFn(seekable_stream: &SeekableStream, amount: isize) !void {
+        const self = @fieldParentPtr(FileSeekableStream, "stream", seekable_stream);
+        return self.file.seekForward(amount) catch return SeekableStream.SeekError.StreamSeekFailure;
+    }
+
+    fn seekToFn(seekable_stream: &SeekableStream, pos: usize) !void {
+        const self = @fieldParentPtr(FileSeekableStream, "stream", seekable_stream);
+        return self.file.seekTo(pos) catch return SeekableStream.SeekError.StreamSeekFailure;
+    }
+
+    fn getPosFn(seekable_stream: &SeekableStream) !usize {
+        const self = @fieldParentPtr(FileSeekableStream, "stream", seekable_stream);
+        return self.file.getPos() catch return SeekableStream.GetPosError.StreamGetPosFailure;
+    }
+
+    fn getEndPosFn(seekable_stream: &SeekableStream) !usize {
+        const self = @fieldParentPtr(FileSeekableStream, "stream", seekable_stream);
+        return self.file.getEndPos() catch return SeekableStream.GetPosError.StreamGetPosFailure;
+    }
+};
+
+pub const FixedBufferSeekableStream = struct {
+    buffer: []u8,
+    index: usize,
+    stream: SeekableStream,
+
+    pub fn init(buffer: []u8) FixedBufferSeekableStream {
+        return FixedBufferSeekableStream {
+            .buffer = buffer,
+            .index = 0,
+            .stream = SeekableStream {
+                .seekForwardFn = seekForwardFn,
+                .seekToFn = seekToFn,
+                .getPosFn = getPosFn,
+                .getEndPosFn = getEndPosFn,
+                .in = InStream(SeekableStream.ReadError) {
+                    .readFn = readFn,
+                },
+                .out = OutStream(SeekableStream.WriteError) {
+                    .writeFn = writeFn,
+                },
+            },
+        };
+    }
+
+    fn writeFn(out_stream: &OutStream(SeekableStream.WriteError), bytes: []const u8) SeekableStream.WriteError!void {
+        const seekable_stream = @fieldParentPtr(SeekableStream, "out", out_stream);
+        const self = @fieldParentPtr(FixedBufferSeekableStream, "stream", seekable_stream);
+
+        mem.copy(u8, self.buffer[self.index..], bytes);
+        self.index += bytes.len;
+    }
+
+    fn readFn(in_stream: &InStream(SeekableStream.ReadError), buffer: []u8) SeekableStream.ReadError!usize {
+        const seekable_stream = @fieldParentPtr(SeekableStream, "in", in_stream);
+        const self = @fieldParentPtr(FixedBufferSeekableStream, "stream", seekable_stream);
+
+        const amt = math.min(buffer.len, self.buffer.len - self.index);
+        mem.copy(u8, buffer, self.buffer[self.index..amt]);
+        self.index += amt;
+        return amt;
+    }
+
+    fn seekForwardFn(seekable_stream: &SeekableStream, amount: isize) SeekableStream.SeekError!void {
+        const self = @fieldParentPtr(FixedBufferSeekableStream, "stream", seekable_stream);
+        self.index = usize(isize(self.index) + amount);
+    }
+
+    fn seekToFn(seekable_stream: &SeekableStream, pos: usize) SeekableStream.SeekError!void {
+        const self = @fieldParentPtr(FixedBufferSeekableStream, "stream", seekable_stream);
+        self.index = pos;
+    }
+
+    fn getPosFn(seekable_stream: &SeekableStream) SeekableStream.GetPosError!usize {
+        const self = @fieldParentPtr(FixedBufferSeekableStream, "stream", seekable_stream);
+        return self.index;
+    }
+
+    fn getEndPosFn(seekable_stream: &SeekableStream) SeekableStream.GetPosError!usize {
+        const self = @fieldParentPtr(FixedBufferSeekableStream, "stream", seekable_stream);
+        return self.buffer.len;
+    }
+};
