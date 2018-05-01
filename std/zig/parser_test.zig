@@ -1,5 +1,46 @@
+test "zig fmt: doc comments before struct field" {
+    try testCanonical(
+        \\pub const Allocator = struct {
+        \\    /// Allocate byte_count bytes and return them in a slice, with the
+        \\    /// slice's pointer aligned at least to alignment bytes.
+        \\    allocFn: fn() void,
+        \\};
+        \\
+    );
+}
+
+test "zig fmt: error set declaration" {
+    try testCanonical(
+        \\const E = error{
+        \\    A,
+        \\    B,
+        \\
+        \\    C,
+        \\};
+        \\
+        \\const Error = error{
+        \\    /// no more memory
+        \\    OutOfMemory,
+        \\};
+        \\
+        \\const Error = error{
+        \\    /// no more memory
+        \\    OutOfMemory,
+        \\
+        \\    /// another
+        \\    Another,
+        \\
+        \\    // end
+        \\};
+        \\
+        \\const Error = error{OutOfMemory};
+        \\const Error = error{};
+        \\
+    );
+}
+
 test "zig fmt: union(enum(u32)) with assigned enum values" {
-      try testCanonical(
+    try testCanonical(
         \\const MultipleChoice = union(enum(u32)) {
         \\    A = 20,
         \\    B = 40,
@@ -23,7 +64,7 @@ test "zig fmt: labeled suspend" {
 
 test "zig fmt: comments before error set decl" {
     try testCanonical(
-        \\const UnexpectedError = error {
+        \\const UnexpectedError = error{
         \\    /// The Operating System returned an undocumented error code.
         \\    Unexpected,
         \\    // another
@@ -140,7 +181,7 @@ test "zig fmt: comments before global variables" {
     );
 }
 
-test "zig fmt: comments before statements" {
+test "zig fmt: comments in statements" {
     try testCanonical(
         \\test "std" {
         \\    // statement comment
@@ -166,22 +207,6 @@ test "zig fmt: comments before test decl" {
         \\// middle
         \\
         \\// end
-        \\
-    );
-}
-
-test "zig fmt: comments before variable declarations" {
-    try testCanonical(
-        \\const std = @import("std");
-        \\
-        \\pub fn main() !void {
-        \\    /// If this program is run without stdout attached, exit with an error.
-        \\    /// another comment
-        \\    var stdout_file = try std.io.getStdOut;
-        \\    // If this program is run without stdout attached, exit with an error.
-        \\    // another comment
-        \\    var stdout_file = try std.io.getStdOut;
-        \\}
         \\
     );
 }
@@ -596,18 +621,6 @@ test "zig fmt: union declaration" {
         \\    Float: f32,
         \\    None,
         \\    Bool: bool,
-        \\};
-        \\
-    );
-}
-
-test "zig fmt: error set declaration" {
-      try testCanonical(
-        \\const E = error {
-        \\    A,
-        \\    B,
-        \\
-        \\    C,
         \\};
         \\
     );
