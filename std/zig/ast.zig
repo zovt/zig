@@ -233,6 +233,7 @@ pub const Node = struct {
         Root,
         Use,
         TestDecl,
+        ExternDecl,
 
         // Statements
         VarDecl,
@@ -511,7 +512,7 @@ pub const Node = struct {
     pub const Use = struct {
         base: Node,
         doc_comments: ?&DocComment,
-        visib_token: ?TokenIndex,
+        pub_token: ?TokenIndex,
         expr: &Node,
         semicolon_token: TokenIndex,
 
@@ -984,7 +985,6 @@ pub const Node = struct {
 
     pub const Comptime = struct {
         base: Node,
-        doc_comments: ?&DocComment,
         comptime_token: TokenIndex,
         expr: &Node,
 
@@ -2170,9 +2170,8 @@ pub const Node = struct {
 
     pub const TestDecl = struct {
         base: Node,
-        doc_comments: ?&DocComment,
         test_token: TokenIndex,
-        name: &Node,
+        name_token: TokenIndex,
         body_node: &Node,
 
         pub fn iterate(self: &TestDecl, index: usize) ?&Node {
@@ -2190,6 +2189,31 @@ pub const Node = struct {
 
         pub fn lastToken(self: &TestDecl) TokenIndex {
             return self.body_node.lastToken();
+        }
+    };
+
+    pub const ExternDecl = struct {
+        base: Node,
+        extern_token: TokenIndex,
+        lib_name_token: TokenIndex,
+        decl: &Node,
+        semicolon_token: TokenIndex,
+
+        pub fn iterate(self: &ExternDecl, index: usize) ?&Node {
+            var i = index;
+
+            if (i < 1) return self.decl;
+            i -= 1;
+
+            return null;
+        }
+
+        pub fn firstToken(self: &ExternDecl) TokenIndex {
+            return self.extern_token;
+        }
+
+        pub fn lastToken(self: &ExternDecl) TokenIndex {
+            return self.semicolon_token;
         }
     };
 };
