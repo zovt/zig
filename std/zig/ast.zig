@@ -460,22 +460,17 @@ pub const Node = struct {
         }
     };
 
-    pub const VarDecl = struct {
+
+    pub const LocalVar = struct {
         base: Node,
-        doc_comments: ?&DocComment,
-        visib_token: ?TokenIndex,
-        name_token: TokenIndex,
-        eq_token: TokenIndex,
-        mut_token: TokenIndex,
         comptime_token: ?TokenIndex,
-        extern_export_token: ?TokenIndex,
-        lib_name: ?&Node,
+        mut_token: TokenIndex,
+        name_token: TokenIndex,
         type_node: ?&Node,
         align_node: ?&Node,
-        init_node: ?&Node,
-        semicolon_token: TokenIndex,
+        init_node: &Node,
 
-        pub fn iterate(self: &VarDecl, index: usize) ?&Node {
+        pub fn iterate(self: &LocalVar, index: usize) ?&Node {
             var i = index;
 
             if (self.type_node) |type_node| {
@@ -496,16 +491,111 @@ pub const Node = struct {
             return null;
         }
 
-        pub fn firstToken(self: &VarDecl) TokenIndex {
-            if (self.visib_token) |visib_token| return visib_token;
+        pub fn firstToken(self: &LocalVar) TokenIndex {
             if (self.comptime_token) |comptime_token| return comptime_token;
-            if (self.extern_export_token) |extern_export_token| return extern_export_token;
-            assert(self.lib_name == null);
             return self.mut_token;
         }
 
-        pub fn lastToken(self: &VarDecl) TokenIndex {
-            return self.semicolon_token;
+        pub fn lastToken(self: &LocalVar) TokenIndex {
+            // + 1 for semicolon
+            return self.init_node.lastToken() + 1;
+        }
+    };
+
+    pub const GlobalVar = struct {
+        base: Node,
+        doc_comments: ?&DocComment,
+        visib_token: ?TokenIndex,
+        linkage: Linkage,
+        mut_token: TokenIndex,
+        name_token: TokenIndex,
+        align_node: ?&Node,
+
+        pub const Linkage = union(enum) {
+            Internal: Internal,
+            Extern: struct {
+                token: TokenIndex,
+                lib_name: ?TokenIndex,
+                type_node: &Node,
+            },
+            Export: struct {
+                token: TokenIndex,
+                internal: Internal,
+            },
+
+            pub const Internal = struct {
+                type_node: ?&Node,
+                section_node: ?&Node,
+                init_node: &Node,
+            };
+        };
+
+        pub fn iterate(self: &GlobalVar, index: usize) ?&Node {
+            var i = index;
+
+            switch (self.extern_export) {
+                Linkage.Internal => |internal| {
+                    if (internal.type_node) |type_node| {
+                        if (i < 1) return type_node;
+                        i -= 1;
+                    }
+                },
+                Linkage.Export => |export_info| {
+                    if (export_info.internal.type_node) |type_node| {
+                        if (i < 1) return type_node;
+                        i -= 1;
+                    }
+                },
+                Linkage.Extern => |extern_info| {
+                    if (i < 1) return extern_info.type_node;
+                    i -= 1;
+                },
+            }
+
+            if (self.align_node) |align_node| {
+                if (i < 1) return align_node;
+                i -= 1;
+            }
+
+            if (self.section_node) |section_node| {
+                if (i < 1) return section_node;
+                i -= 1;
+            }
+
+            switch (self.extern_export) {
+                Linkage.Internal => |internal| {
+                    if (i < 1) return internal.init_node;
+                    i -= 1;
+                },
+                Linkage.Export => |export_info| {
+                    if (i < 1) return export_info.internal.init_node;
+                    i -= 1;
+                },
+                Linkage.Extern => {},
+            }
+
+            return null;
+        }
+
+        pub fn firstToken(self: &GlobalVar) TokenIndex {
+            if (self.visib_token) |visib_token| return visib_token;
+            switch (self.extern_export) {
+                Linkage.Internal => return self.mut_token,
+                Linkage.Export => |export_info| return export_info.token;
+                Linkage.Extern => |extern_info| return extern_info.token;
+            }
+        }
+
+        pub fn lastToken(self: &GlobalVar) TokenIndex {
+            // + 1 for the semicolon
+            switch (self.extern_export) {
+                Linkage.Internal => |internal| return internal.init_node.lastToken() + 1;
+                Linkage.Export => |export_info| return export_info.internal.init_node.lastToken() + 1;
+                Linkage.Extern => |extern_info| {
+                    if (self.align_node) |align_node| return align_node.lastToken() + 1;
+                    return extern_info.type_node.lastToken() + 1;
+                },
+            }
         }
     };
 
