@@ -14,8 +14,7 @@ pub fn tagName(value: var) []const u8 {
         TypeId.Enum => |info| {
             const TagType = info.tag_type;
             inline for (info.fields) |field| {
-                if (field.value == TagType(value))
-                    return field.name;
+                if (field.value == TagType(value)) return field.name;
             }
 
             unreachable;
@@ -35,8 +34,7 @@ pub fn tagName(value: var) []const u8 {
         //},
         TypeId.ErrorSet => |info| {
             inline for (info.errors) |err| {
-                if (err.value == u64(value))
-                    return err.name;
+                if (err.value == u64(value)) return err.name;
             }
 
             unreachable;
@@ -81,29 +79,26 @@ test "std.meta.tagName" {
     //debug.assert(mem.eql(u8, tagName(u2b), "B"));
 }
 
-
 pub fn maxValue(comptime T: type) T {
     switch (@typeInfo(T)) {
         TypeId.Enum => |info| {
             const TagType = info.tag_type;
             var max = TagType(info.fields[0].value);
             inline for (info.fields[1..]) |field| {
-                if (max < field.value)
-                    max = TagType(field.value);
+                if (max < field.value) max = TagType(field.value);
             }
 
             return T(max);
         },
         TypeId.Int => |info| {
-            if (info.is_signed)
-                return T((1 << info.bits - 1) - 1);
+            if (info.is_signed) return T((1 << info.bits - 1) - 1);
 
             return T((1 << info.bits) - 1);
         },
         // TODO: Floats
         //TypeId.Float => |info| {
         //},
-        else => @compileError("no max value available for type '" ++ @typeName(T) ++ "'")
+        else => @compileError("no max value available for type '" ++ @typeName(T) ++ "'"),
     }
 }
 
@@ -131,22 +126,20 @@ pub fn minValue(comptime T: type) T {
             const TagType = info.tag_type;
             var min = TagType(info.fields[0].value);
             inline for (info.fields[1..]) |field| {
-                if (min > field.value)
-                    min = TagType(field.value);
+                if (min > field.value) min = TagType(field.value);
             }
 
             return T(min);
         },
         TypeId.Int => |info| {
-            if (info.is_signed)
-                return T(-(1 << info.bits - 1));
+            if (info.is_signed) return T(-(1 << info.bits - 1));
 
             return T(0);
         },
         // TODO: Floats
         //TypeId.Float => |info| {
         //},
-        else => @compileError("no max value available for type '" ++ @typeName(T) ++ "'")
+        else => @compileError("no max value available for type '" ++ @typeName(T) ++ "'"),
     }
 }
 
