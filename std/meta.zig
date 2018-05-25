@@ -80,3 +80,91 @@ test "std.meta.tagName" {
     //debug.assert(mem.eql(u8, tagName(u2a), "A"));
     //debug.assert(mem.eql(u8, tagName(u2b), "B"));
 }
+
+
+pub fn maxValue(comptime T: type) T {
+    switch (@typeInfo(T)) {
+        TypeId.Enum => |info| {
+            const TagType = info.tag_type;
+            var max = TagType(info.fields[0].value);
+            inline for (info.fields[1..]) |field| {
+                if (max < field.value)
+                    max = TagType(field.value);
+            }
+
+            return T(max);
+        },
+        TypeId.Int => |info| {
+            // maxValue of i8 and u7 are the same
+            if (info.is_signed)
+                return maxValue(@IntType(false, info.bits - 1));
+
+            return ~T(0);
+        },
+        // TODO: Floats
+        //TypeId.Float => |info| {
+        //},
+        else => @compileError("no max value available for type '" ++ @typeName(T) ++ "'")
+    }
+}
+
+test "std.meta.maxValue" {
+    const E1 = enum {
+        A,
+        B,
+    };
+    const E2 = enum(u8) {
+        C = 33,
+        D = 22,
+    };
+
+    debug.assert(maxValue(E1) == E1.B);
+    debug.assert(maxValue(E2) == E2.C);
+    debug.assert(maxValue(u8) == 255);
+    debug.assert(maxValue(i8) == 127);
+    debug.assert(maxValue(u7) == 127);
+    debug.assert(maxValue(i7) == 63);
+}
+
+pub fn minValue(comptime T: type) T {
+    switch (@typeInfo(T)) {
+        TypeId.Enum => |info| {
+            const TagType = info.tag_type;
+            var min = TagType(info.fields[0].value);
+            inline for (info.fields[1..]) |field| {
+                if (min > field.value)
+                    min = TagType(field.value);
+            }
+
+            return T(min);
+        },
+        TypeId.Int => |info| {
+            if (info.is_signed)
+                return -maxValue(T) - 1;
+
+            return 0;
+        },
+        // TODO: Floats
+        //TypeId.Float => |info| {
+        //},
+        else => @compileError("no max value available for type '" ++ @typeName(T) ++ "'")
+    }
+}
+
+test "std.meta.minValue" {
+    const E1 = enum {
+        A,
+        B,
+    };
+    const E2 = enum(u8) {
+        C = 33,
+        D = 22,
+    };
+
+    debug.assert(minValue(E1) == E1.A);
+    debug.assert(minValue(E2) == E2.D);
+    debug.assert(minValue(u8) == 0);
+    debug.assert(minValue(i8) == -128);
+    debug.assert(minValue(u7) == 0);
+    debug.assert(minValue(i7) == -64);
+}
