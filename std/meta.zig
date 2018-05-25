@@ -95,11 +95,10 @@ pub fn maxValue(comptime T: type) T {
             return T(max);
         },
         TypeId.Int => |info| {
-            // maxValue of i8 and u7 are the same
             if (info.is_signed)
-                return maxValue(@IntType(false, info.bits - 1));
+                return T((1 << info.bits - 1) - 1);
 
-            return ~T(0);
+            return T((1 << info.bits) - 1);
         },
         // TODO: Floats
         //TypeId.Float => |info| {
@@ -140,9 +139,9 @@ pub fn minValue(comptime T: type) T {
         },
         TypeId.Int => |info| {
             if (info.is_signed)
-                return -maxValue(T) - 1;
+                return T(-(1 << info.bits - 1));
 
-            return 0;
+            return T(0);
         },
         // TODO: Floats
         //TypeId.Float => |info| {
