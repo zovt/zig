@@ -8,7 +8,10 @@ const math = std.math;
 const TypeId = builtin.TypeId;
 const TypeInfo = builtin.TypeInfo;
 
-pub fn tagName(value: var) []const u8 {
+pub fn tagName(v: var) []const u8 {
+    // TODO: We only do this because we dont have https://github.com/ziglang/zig/issues/733
+    const value = if (@typeInfo(@typeOf(v)) == TypeId.Pointer) *v else v;
+
     const T = @typeOf(value);
     switch (@typeInfo(T)) {
         TypeId.Enum => |info| {
@@ -19,19 +22,19 @@ pub fn tagName(value: var) []const u8 {
 
             unreachable;
         },
-        // TODO: When https://github.com/ziglang/zig/issues/733 is a thing, we can have unions too.
-        //TypeId.Union => |info| {
-        //    const TagType = info.tag_type;
-        //    if (TagType == @typeOf(undefined))
-        //        @compileError("union has no associated enum");
-        //
-        //    inline for (info.fields) |field| {
-        //        if ((??field.enum_field).value == TagType(value))
-        //            return field.name;
-        //    }
-        //
-        //    unreachable;
-        //},
+        TypeId.Union => |info| {
+            const UnionTagType = info.tag_type;
+            if (UnionTagType == @typeOf(undefined))
+                @compileError("union has no associated enum");
+
+            const TagType = @typeInfo(UnionTagType).Enum.tag_type;
+            inline for (info.fields) |field| {
+                if ((??field.enum_field).value == TagType(UnionTagType(value)))
+                    return field.name;
+            }
+
+            unreachable;
+        },
         TypeId.ErrorSet => |info| {
             inline for (info.errors) |err| {
                 if (err.value == u64(value)) return err.name;
@@ -56,15 +59,15 @@ test "std.meta.tagName" {
         G: u8,
         H: u16,
     };
-    const U2 = union(E1) {
-        A: u8,
-        B: u16,
+    const U2 = union(E2) {
+        C: u8,
+        D: u16,
     };
 
     var u1g = U1{ .G = 0 };
     var u1h = U1{ .H = 0 };
-    var u2a = U2{ .A = 0 };
-    var u2b = U2{ .B = 0 };
+    var u2a = U2{ .C = 0 };
+    var u2b = U2{ .D = 0 };
 
     debug.assert(mem.eql(u8, tagName(E1.A), "A"));
     debug.assert(mem.eql(u8, tagName(E1.B), "B"));
@@ -72,11 +75,10 @@ test "std.meta.tagName" {
     debug.assert(mem.eql(u8, tagName(E2.D), "D"));
     debug.assert(mem.eql(u8, tagName(error.E), "E"));
     debug.assert(mem.eql(u8, tagName(error.F), "F"));
-
-    //debug.assert(mem.eql(u8, tagName(u1g), "G"));
-    //debug.assert(mem.eql(u8, tagName(u1h), "H"));
-    //debug.assert(mem.eql(u8, tagName(u2a), "A"));
-    //debug.assert(mem.eql(u8, tagName(u2b), "B"));
+    debug.assert(mem.eql(u8, tagName(u1g), "G"));
+    debug.assert(mem.eql(u8, tagName(u1h), "H"));
+    debug.assert(mem.eql(u8, tagName(u2a), "C"));
+    debug.assert(mem.eql(u8, tagName(u2b), "D"));
 }
 
 pub fn maxValue(comptime T: type) T {
