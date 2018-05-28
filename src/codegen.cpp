@@ -3468,36 +3468,6 @@ static LLVMValueRef ir_render_err_name(CodeGen *g, IrExecutable *executable, IrI
     return LLVMBuildInBoundsGEP(g->builder, g->err_name_table, indices, 2, "");
 }
 
-static LLVMValueRef ir_render_enum_tag_name(CodeGen *g, IrExecutable *executable,
-        IrInstructionTagName *instruction)
-{
-    TypeTableEntry *enum_type = instruction->target->value.type;
-    assert(enum_type->id == TypeTableEntryIdEnum);
-    assert(enum_type->data.enumeration.generate_name_table);
-
-    TypeTableEntry *tag_int_type = enum_type->data.enumeration.tag_int_type;
-    LLVMValueRef enum_tag_value = ir_llvm_value(g, instruction->target);
-    if (ir_want_runtime_safety(g, &instruction->base)) {
-        size_t field_count = enum_type->data.enumeration.src_field_count;
-
-        // if the field_count can't fit in the bits of the enum_type, then it can't possibly
-        // be the wrong value
-        BigInt field_bi;
-        bigint_init_unsigned(&field_bi, field_count);
-        if (bigint_fits_in_bits(&field_bi, tag_int_type->data.integral.bit_count, false)) {
-            LLVMValueRef end_val = LLVMConstInt(LLVMTypeOf(enum_tag_value), field_count, false);
-            add_bounds_check(g, enum_tag_value, LLVMIntEQ, nullptr, LLVMIntULT, end_val);
-        }
-    }
-
-    LLVMValueRef indices[] = {
-        LLVMConstNull(g->builtin_types.entry_usize->type_ref),
-        gen_widen_or_shorten(g, false, tag_int_type,
-                g->builtin_types.entry_usize, enum_tag_value),
-    };
-    return LLVMBuildInBoundsGEP(g->builder, enum_type->data.enumeration.name_table, indices, 2, "");
-}
-
 static LLVMValueRef ir_render_field_parent_ptr(CodeGen *g, IrExecutable *executable,
         IrInstructionFieldParentPtr *instruction)
 {
@@ -4719,8 +4689,6 @@ static LLVMValueRef ir_render_instruction(CodeGen *g, IrExecutable *executable, 
             return ir_render_container_init_list(g, executable, (IrInstructionContainerInitList *)instruction);
         case IrInstructionIdPanic:
             return ir_render_panic(g, executable, (IrInstructionPanic *)instruction);
-        case IrInstructionIdTagName:
-            return ir_render_enum_tag_name(g, executable, (IrInstructionTagName *)instruction);
         case IrInstructionIdFieldParentPtr:
             return ir_render_field_parent_ptr(g, executable, (IrInstructionFieldParentPtr *)instruction);
         case IrInstructionIdAlignCast:
@@ -6252,7 +6220,6 @@ static void define_builtin_fns(CodeGen *g) {
     create_builtin_fn(g, BuiltinFnIdBitCast, "bitCast", 2);
     create_builtin_fn(g, BuiltinFnIdIntToPtr, "intToPtr", 2);
     create_builtin_fn(g, BuiltinFnIdPtrToInt, "ptrToInt", 1);
-    create_builtin_fn(g, BuiltinFnIdTagName, "tagName", 1);
     create_builtin_fn(g, BuiltinFnIdTagType, "TagType", 1);
     create_builtin_fn(g, BuiltinFnIdFieldParentPtr, "fieldParentPtr", 3);
     create_builtin_fn(g, BuiltinFnIdOffsetOf, "offsetOf", 2);

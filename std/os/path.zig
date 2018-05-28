@@ -1,6 +1,7 @@
 const std = @import("../index.zig");
 const builtin = @import("builtin");
 const Os = builtin.Os;
+const meta = std.meta;
 const debug = std.debug;
 const assert = debug.assert;
 const mem = std.mem;
@@ -1160,7 +1161,7 @@ pub fn real(allocator: *Allocator, pathname: []const u8) ![]u8 {
 
             return os.readLink(allocator, proc_path);
         },
-        else => @compileError("TODO implement os.path.real for " ++ @tagName(builtin.os)),
+        else => @compileError("TODO implement os.path.real for " ++ meta.tagName(builtin.os)),
     }
 }
 

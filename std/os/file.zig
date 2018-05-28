@@ -1,5 +1,6 @@
 const std = @import("../index.zig");
 const builtin = @import("builtin");
+const meta = std.meta;
 const os = std.os;
 const mem = std.mem;
 const math = std.math;
@@ -206,7 +207,7 @@ pub const File = struct {
                     };
                 }
             },
-            else => @compileError("unsupported OS: " ++ @tagName(builtin.os)),
+            else => @compileError("unsupported OS: " ++ meta.tagName(builtin.os)),
         }
     }
 

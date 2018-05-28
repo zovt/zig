@@ -596,10 +596,6 @@ static constexpr IrInstructionId ir_instruction_id(IrInstructionPanic *) {
     return IrInstructionIdPanic;
 }
 
-static constexpr IrInstructionId ir_instruction_id(IrInstructionTagName *) {
-    return IrInstructionIdTagName;
-}
-
 static constexpr IrInstructionId ir_instruction_id(IrInstructionTagType *) {
     return IrInstructionIdTagType;
 }
@@ -2382,17 +2378,6 @@ static IrInstruction *ir_build_panic(IrBuilder *irb, Scope *scope, AstNode *sour
     instruction->msg = msg;
 
     ir_ref_instruction(msg, irb->current_basic_block);
-
-    return &instruction->base;
-}
-
-static IrInstruction *ir_build_tag_name(IrBuilder *irb, Scope *scope, AstNode *source_node,
-        IrInstruction *target)
-{
-    IrInstructionTagName *instruction = ir_build_instruction<IrInstructionTagName>(irb, scope, source_node);
-    instruction->target = target;
-
-    ir_ref_instruction(target, irb->current_basic_block);
 
     return &instruction->base;
 }
@@ -4200,17 +4185,6 @@ static IrInstruction *ir_gen_builtin_fn_call(IrBuilder *irb, Scope *scope, AstNo
 
                 IrInstruction *ptr_to_int = ir_build_ptr_to_int(irb, scope, node, arg0_value);
                 return ir_lval_wrap(irb, scope, ptr_to_int, lval);
-            }
-        case BuiltinFnIdTagName:
-            {
-                AstNode *arg0_node = node->data.fn_call_expr.params.at(0);
-                IrInstruction *arg0_value = ir_gen_node(irb, arg0_node, scope);
-                if (arg0_value == irb->codegen->invalid_instruction)
-                    return arg0_value;
-
-                IrInstruction *actual_tag = ir_build_union_tag(irb, scope, node, arg0_value);
-                IrInstruction *tag_name = ir_build_tag_name(irb, scope, node, actual_tag);
-                return ir_lval_wrap(irb, scope, tag_name, lval);
             }
         case BuiltinFnIdTagType:
             {
@@ -15543,34 +15517,6 @@ static TypeTableEntry *ir_analyze_instruction_err_name(IrAnalyze *ira, IrInstruc
     return str_type;
 }
 
-static TypeTableEntry *ir_analyze_instruction_enum_tag_name(IrAnalyze *ira, IrInstructionTagName *instruction) {
-    IrInstruction *target = instruction->target->other;
-    if (type_is_invalid(target->value.type))
-        return ira->codegen->builtin_types.entry_invalid;
-
-    assert(target->value.type->id == TypeTableEntryIdEnum);
-
-    if (instr_is_comptime(target)) {
-        TypeEnumField *field = find_enum_field_by_tag(target->value.type, &target->value.data.x_bigint);
-        ConstExprValue *array_val = create_const_str_lit(ira->codegen, field->name);
-        ConstExprValue *out_val = ir_build_const_from(ira, &instruction->base);
-        init_const_slice(ira->codegen, out_val, array_val, 0, buf_len(field->name), true);
-        return out_val->type;
-    }
-
-    if (!target->value.type->data.enumeration.generate_name_table) {
-        target->value.type->data.enumeration.generate_name_table = true;
-        ira->codegen->name_table_enums.append(target->value.type);
-    }
-
-    IrInstruction *result = ir_build_tag_name(&ira->new_irb, instruction->base.scope,
-            instruction->base.source_node, target);
-    ir_link_new_instruction(result, &instruction->base);
-    TypeTableEntry *u8_ptr_type = get_pointer_to_type(ira->codegen, ira->codegen->builtin_types.entry_u8, true);
-    result->value.type = get_slice_type(ira->codegen, u8_ptr_type);
-    return result->value.type;
-}
-
 static TypeTableEntry *ir_analyze_instruction_field_parent_ptr(IrAnalyze *ira,
         IrInstructionFieldParentPtr *instruction)
 {
@@ -19522,8 +19468,6 @@ static TypeTableEntry *ir_analyze_instruction_nocast(IrAnalyze *ira, IrInstructi
             return ir_analyze_instruction_int_to_ptr(ira, (IrInstructionIntToPtr *)instruction);
         case IrInstructionIdPtrToInt:
             return ir_analyze_instruction_ptr_to_int(ira, (IrInstructionPtrToInt *)instruction);
-        case IrInstructionIdTagName:
-            return ir_analyze_instruction_enum_tag_name(ira, (IrInstructionTagName *)instruction);
         case IrInstructionIdFieldParentPtr:
             return ir_analyze_instruction_field_parent_ptr(ira, (IrInstructionFieldParentPtr *)instruction);
         case IrInstructionIdOffsetOf:
@@ -19791,7 +19735,6 @@ bool ir_has_side_effects(IrInstruction *instruction) {
         case IrInstructionIdDeclRef:
         case IrInstructionIdErrName:
         case IrInstructionIdTypeName:
-        case IrInstructionIdTagName:
         case IrInstructionIdFieldParentPtr:
         case IrInstructionIdOffsetOf:
         case IrInstructionIdTypeInfo:

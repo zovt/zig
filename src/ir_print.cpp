@@ -908,11 +908,6 @@ static void ir_print_type_name(IrPrint *irp, IrInstructionTypeName *instruction)
     ir_print_other_instruction(irp, instruction->type_value);
 }
 
-static void ir_print_tag_name(IrPrint *irp, IrInstructionTagName *instruction) {
-    fprintf(irp->f, "tagname ");
-    ir_print_other_instruction(irp, instruction->target);
-}
-
 static void ir_print_can_implicit_cast(IrPrint *irp, IrInstructionCanImplicitCast *instruction) {
     fprintf(irp->f, "@canImplicitCast(");
     ir_print_other_instruction(irp, instruction->type_value);
@@ -1512,9 +1507,6 @@ static void ir_print_instruction(IrPrint *irp, IrInstruction *instruction) {
             break;
         case IrInstructionIdTypeName:
             ir_print_type_name(irp, (IrInstructionTypeName *)instruction);
-            break;
-        case IrInstructionIdTagName:
-            ir_print_tag_name(irp, (IrInstructionTagName *)instruction);
             break;
         case IrInstructionIdCanImplicitCast:
             ir_print_can_implicit_cast(irp, (IrInstructionCanImplicitCast *)instruction);

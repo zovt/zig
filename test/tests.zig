@@ -1,4 +1,5 @@
 const std = @import("std");
+const meta = std.meta;
 const debug = std.debug;
 const warn = debug.warn;
 const build = std.build;
@@ -164,7 +165,7 @@ pub fn addPkgTests(b: *build.Builder, test_filter: ?[]const u8, root_src: []cons
                     continue;
                 }
                 const these_tests = b.addTest(root_src);
-                these_tests.setNamePrefix(b.fmt("{}-{}-{}-{}-{} ", name, @tagName(test_target.os), @tagName(test_target.arch), @tagName(mode), if (link_libc) "c" else "bare"));
+                these_tests.setNamePrefix(b.fmt("{}-{}-{}-{}-{} ", name, meta.tagName(test_target.os), meta.tagName(test_target.arch), meta.tagName(mode), if (link_libc) "c" else "bare"));
                 these_tests.setFilter(test_filter);
                 these_tests.setBuildMode(mode);
                 if (!is_native) {
@@ -454,7 +455,7 @@ pub const CompareOutputContext = struct {
                     Mode.ReleaseFast,
                     Mode.ReleaseSmall,
                 }) |mode| {
-                    const annotated_case_name = fmt.allocPrint(self.b.allocator, "{} {} ({})", "compare-output", case.name, @tagName(mode)) catch unreachable;
+                    const annotated_case_name = fmt.allocPrint(self.b.allocator, "{} {} ({})", "compare-output", case.name, meta.tagName(mode)) catch unreachable;
                     if (self.test_filter) |filter| {
                         if (mem.indexOf(u8, annotated_case_name, filter) == null) continue;
                     }
@@ -702,7 +703,7 @@ pub const CompileErrorContext = struct {
             Mode.Debug,
             Mode.ReleaseFast,
         }) |mode| {
-            const annotated_case_name = fmt.allocPrint(self.b.allocator, "compile-error {} ({})", case.name, @tagName(mode)) catch unreachable;
+            const annotated_case_name = fmt.allocPrint(self.b.allocator, "compile-error {} ({})", case.name, meta.tagName(mode)) catch unreachable;
             if (self.test_filter) |filter| {
                 if (mem.indexOf(u8, annotated_case_name, filter) == null) continue;
             }
@@ -772,7 +773,7 @@ pub const BuildExamplesContext = struct {
             Mode.ReleaseFast,
             Mode.ReleaseSmall,
         }) |mode| {
-            const annotated_case_name = fmt.allocPrint(self.b.allocator, "build {} ({})", root_src, @tagName(mode)) catch unreachable;
+            const annotated_case_name = fmt.allocPrint(self.b.allocator, "build {} ({})", root_src, meta.tagName(mode)) catch unreachable;
             if (self.test_filter) |filter| {
                 if (mem.indexOf(u8, annotated_case_name, filter) == null) continue;
             }
@@ -1094,7 +1095,7 @@ pub const GenHContext = struct {
         const root_src = os.path.join(b.allocator, b.cache_root, case.sources.items[0].filename) catch unreachable;
 
         const mode = builtin.Mode.Debug;
-        const annotated_case_name = fmt.allocPrint(self.b.allocator, "gen-h {} ({})", case.name, @tagName(mode)) catch unreachable;
+        const annotated_case_name = fmt.allocPrint(self.b.allocator, "gen-h {} ({})", case.name, meta.tagName(mode)) catch unreachable;
         if (self.test_filter) |filter| {
             if (mem.indexOf(u8, annotated_case_name, filter) == null) return;
         }

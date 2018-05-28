@@ -1,4 +1,5 @@
 const std = @import("../index.zig");
+const meta = std.meta;
 const assert = std.debug.assert;
 const SegmentedList = std.SegmentedList;
 const mem = std.mem;
@@ -172,13 +173,13 @@ pub const Error = union(enum) {
 
     pub const InvalidToken = SingleTokenError("Invalid token {}");
     pub const ExpectedVarDeclOrFn = SingleTokenError("Expected variable declaration or function, found {}");
-    pub const ExpectedAggregateKw = SingleTokenError("Expected " ++ @tagName(Token.Id.Keyword_struct) ++ ", " ++ @tagName(Token.Id.Keyword_union) ++ ", or " ++ @tagName(Token.Id.Keyword_enum) ++ ", found {}");
+    pub const ExpectedAggregateKw = SingleTokenError("Expected " ++ meta.tagName(Token.Id.Keyword_struct) ++ ", " ++ meta.tagName(Token.Id.Keyword_union) ++ ", or " ++ meta.tagName(Token.Id.Keyword_enum) ++ ", found {}");
     pub const ExpectedEqOrSemi = SingleTokenError("Expected '=' or ';', found {}");
     pub const ExpectedSemiOrLBrace = SingleTokenError("Expected ';' or '{{', found {}");
     pub const ExpectedColonOrRParen = SingleTokenError("Expected ':' or ')', found {}");
     pub const ExpectedLabelable = SingleTokenError("Expected 'while', 'for', 'inline', 'suspend', or '{{', found {}");
     pub const ExpectedInlinable = SingleTokenError("Expected 'while' or 'for', found {}");
-    pub const ExpectedAsmOutputReturnOrType = SingleTokenError("Expected '->' or " ++ @tagName(Token.Id.Identifier) ++ ", found {}");
+    pub const ExpectedAsmOutputReturnOrType = SingleTokenError("Expected '->' or " ++ meta.tagName(Token.Id.Identifier) ++ ", found {}");
     pub const ExpectedSliceOrRBracket = SingleTokenError("Expected ']' or '..', found {}");
     pub const ExpectedPrimaryExpr = SingleTokenError("Expected primary expression, found {}");
 
@@ -191,7 +192,7 @@ pub const Error = union(enum) {
         node: *Node,
 
         pub fn render(self: *const ExpectedCall, tokens: *Tree.TokenList, stream: var) !void {
-            return stream.print("expected " ++ @tagName(@TagType(Node.SuffixOp.Op).Call) ++ ", found {}", @tagName(self.node.id));
+            return stream.print("expected " ++ comptime meta.tagName(@TagType(Node.SuffixOp.Op).Call) ++ ", found {}", meta.tagName(self.node.id));
         }
     };
 
@@ -199,7 +200,7 @@ pub const Error = union(enum) {
         node: *Node,
 
         pub fn render(self: *const ExpectedCallOrFnProto, tokens: *Tree.TokenList, stream: var) !void {
-            return stream.print("expected " ++ @tagName(@TagType(Node.SuffixOp.Op).Call) ++ " or " ++ @tagName(Node.Id.FnProto) ++ ", found {}", @tagName(self.node.id));
+            return stream.print("expected " ++ comptime meta.tagName(@TagType(Node.SuffixOp.Op).Call) ++ " or " ++ meta.tagName(Node.Id.FnProto) ++ ", found {}", meta.tagName(self.node.id));
         }
     };
 
@@ -208,8 +209,8 @@ pub const Error = union(enum) {
         expected_id: @TagType(Token.Id),
 
         pub fn render(self: *const ExpectedToken, tokens: *Tree.TokenList, stream: var) !void {
-            const token_name = @tagName(tokens.at(self.token).id);
-            return stream.print("expected {}, found {}", @tagName(self.expected_id), token_name);
+            const token_name = meta.tagName(tokens.at(self.token).id);
+            return stream.print("expected {}, found {}", meta.tagName(self.expected_id), token_name);
         }
     };
 
@@ -218,8 +219,8 @@ pub const Error = union(enum) {
         end_id: @TagType(Token.Id),
 
         pub fn render(self: *const ExpectedCommaOrEnd, tokens: *Tree.TokenList, stream: var) !void {
-            const token_name = @tagName(tokens.at(self.token).id);
-            return stream.print("expected ',' or {}, found {}", @tagName(self.end_id), token_name);
+            const token_name = meta.tagName(tokens.at(self.token).id);
+            return stream.print("expected ',' or {}, found {}", meta.tagName(self.end_id), token_name);
         }
     };
 
@@ -230,7 +231,7 @@ pub const Error = union(enum) {
             token: TokenIndex,
 
             pub fn render(self: *const ThisError, tokens: *Tree.TokenList, stream: var) !void {
-                const token_name = @tagName(tokens.at(self.token).id);
+                const token_name = meta.tagName(tokens.at(self.token).id);
                 return stream.print(msg, token_name);
             }
         };
@@ -450,7 +451,7 @@ pub const Node = struct {
                 std.debug.warn(" ");
             }
         }
-        std.debug.warn("{}\n", @tagName(self.id));
+        std.debug.warn("{}\n", meta.tagName(self.id));
 
         var child_i: usize = 0;
         while (self.iterate(child_i)) |child| : (child_i += 1) {
