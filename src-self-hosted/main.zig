@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const meta = std.meta;
 const os = std.os;
 const io = std.io;
 const mem = std.mem;
@@ -609,7 +610,7 @@ fn buildOutputType(allocator: &Allocator, args: []const []const u8, out_type: Mo
         // codegen_print_timing_info(g, stderr);
     }
 
-    try stderr.print("building {}: {}\n", @tagName(out_type), in_file);
+    try stderr.print("building {}: {}\n", meta.tagName(out_type), in_file);
 }
 
 fn cmdBuildExe(allocator: &Allocator, args: []const []const u8) !void {
@@ -721,8 +722,14 @@ fn cmdTargets(allocator: &Allocator, args: []const []const u8) !void {
         inline while (i < @memberCount(builtin.Arch)) : (i += 1) {
             comptime const arch_tag = @memberName(builtin.Arch, i);
             // NOTE: Cannot use empty string, see #918.
+            const tag_name = comptime blk: {
+                // TODO: Figure out why we need more than 10000 to eval this...
+                @setEvalBranchQuota(15000);
+                break :blk meta.tagName(builtin.arch);
+            };
+
             comptime const native_str =
-                if (comptime mem.eql(u8, arch_tag, @tagName(builtin.arch))) " (native)\n" else "\n";
+                if (comptime mem.eql(u8, arch_tag, tag_name)) " (native)\n" else "\n";
 
             try stdout.print("  {}{}", arch_tag, native_str);
         }
@@ -736,7 +743,7 @@ fn cmdTargets(allocator: &Allocator, args: []const []const u8) !void {
             comptime const os_tag = @memberName(builtin.Os, i);
             // NOTE: Cannot use empty string, see #918.
             comptime const native_str =
-                if (comptime mem.eql(u8, os_tag, @tagName(builtin.os))) " (native)\n" else "\n";
+                if (comptime mem.eql(u8, os_tag, meta.tagName(builtin.os))) " (native)\n" else "\n";
 
             try stdout.print("  {}{}", os_tag, native_str);
         }
@@ -750,7 +757,7 @@ fn cmdTargets(allocator: &Allocator, args: []const []const u8) !void {
             comptime const environ_tag = @memberName(builtin.Environ, i);
             // NOTE: Cannot use empty string, see #918.
             comptime const native_str =
-                if (comptime mem.eql(u8, environ_tag, @tagName(builtin.environ))) " (native)\n" else "\n";
+                if (comptime mem.eql(u8, environ_tag, meta.tagName(builtin.environ))) " (native)\n" else "\n";
 
             try stdout.print("  {}{}", environ_tag, native_str);
         }

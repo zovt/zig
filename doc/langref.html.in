@@ -1925,11 +1925,6 @@ test "@memberCount" {
 test "@memberName" {
     assert(mem.eql(u8, @memberName(Small, 1), "Two"));
 }
-
-// @tagName gives a []const u8 representation of an enum value:
-test "@tagName" {
-    assert(mem.eql(u8, @tagName(Small.Three), "Three"));
-}
       {#code_end#}
       {#header_open|extern enum#}
       <p>
@@ -1964,7 +1959,7 @@ test "packed enum" {
 }
       {#code_end#}
       {#header_close#}
-      {#see_also|@memberName|@memberCount|@tagName|@sizeOf#}
+      {#see_also|@memberName|@memberCount|@sizeOf#}
       {#header_close#}
       {#header_open|union#}
       {#code_begin|test|union#}
@@ -2070,17 +2065,6 @@ test "@memberCount" {
 // @memberName tells the name of a field in an enum:
 test "@memberName" {
     assert(mem.eql(u8, @memberName(Small, 1), "B"));
-}
-
-// @tagName gives a []const u8 representation of an enum value,
-// but only if the union has an enum tag type.
-const Small2 = union(enum) {
-    A: i32,
-    B: bool,
-    C: u8,
-};
-test "@tagName" {
-    assert(mem.eql(u8, @tagName(Small2.C), "C"));
 }
       {#code_end#}
       <p>
@@ -4295,12 +4279,6 @@ test "main" {
       <pre><code class="zig">@export(comptime name: []const u8, target: var, linkage: builtin.GlobalLinkage) -&gt; []const u8</code></pre>
       <p>
       Creates a symbol in the output object file.
-      </p>
-      {#header_close#}
-      {#header_open|@tagName#}
-      <pre><code class="zig">@tagName(value: var) -&gt; []const u8</code></pre>
-      <p>
-      Converts an enum value or union value to a slice of bytes representing the name.
       </p>
       {#header_close#}
       {#header_open|@TagType#}
@@ -6532,7 +6510,7 @@ hljs.registerLanguage("zig", function(t) {
         a = t.IR + "\\s*\\(",
         c = {
             keyword: "const align var extern stdcallcc nakedcc volatile export pub noalias inline struct packed enum union break return try catch test continue unreachable comptime and or asm defer errdefer if else switch while for fn use bool f32 f64 void type noreturn error i8 u8 i16 u16 i32 u32 i64 u64 isize usize i8w u8w i16w i32w u32w i64w u64w isizew usizew c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong",
-            built_in: "atomicLoad breakpoint returnAddress frameAddress fieldParentPtr setFloatMode IntType OpaqueType compileError compileLog setCold setRuntimeSafety setEvalBranchQuota offsetOf memcpy inlineCall setGlobalLinkage setGlobalSection divTrunc divFloor enumTagName intToPtr ptrToInt panic canImplicitCast ptrCast bitCast rem mod memset sizeOf alignOf alignCast maxValue minValue memberCount memberName memberType typeOf addWithOverflow subWithOverflow mulWithOverflow shlWithOverflow shlExact shrExact cInclude cDefine cUndef ctz clz import cImport errorName embedFile cmpxchgStrong cmpxchgWeak fence divExact truncate atomicRmw sqrt field typeInfo newStackCall",
+            built_in: "atomicLoad breakpoint returnAddress frameAddress fieldParentPtr setFloatMode IntType OpaqueType compileError compileLog setCold setRuntimeSafety setEvalBranchQuota offsetOf memcpy inlineCall setGlobalLinkage setGlobalSection divTrunc divFloor intToPtr ptrToInt panic canImplicitCast ptrCast bitCast rem mod memset sizeOf alignOf alignCast maxValue minValue memberCount memberName memberType typeOf addWithOverflow subWithOverflow mulWithOverflow shlWithOverflow shlExact shrExact cInclude cDefine cUndef ctz clz import cImport errorName embedFile cmpxchgStrong cmpxchgWeak fence divExact truncate atomicRmw sqrt field typeInfo newStackCall",
             literal: "true false null undefined"
         },
         n = [e, t.CLCM, t.CBCM, s, r];

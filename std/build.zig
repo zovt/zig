@@ -1,5 +1,6 @@
 const std = @import("index.zig");
 const builtin = @import("builtin");
+const meta = std.meta;
 const io = std.io;
 const mem = std.mem;
 const debug = std.debug;
@@ -1246,13 +1247,13 @@ pub const LibExeObjStep = struct {
             Target.Native => {},
             Target.Cross => |cross_target| {
                 zig_args.append("--target-arch") catch unreachable;
-                zig_args.append(@tagName(cross_target.arch)) catch unreachable;
+                zig_args.append(meta.tagName(cross_target.arch)) catch unreachable;
 
                 zig_args.append("--target-os") catch unreachable;
-                zig_args.append(@tagName(cross_target.os)) catch unreachable;
+                zig_args.append(meta.tagName(cross_target.os)) catch unreachable;
 
                 zig_args.append("--target-environ") catch unreachable;
-                zig_args.append(@tagName(cross_target.environ)) catch unreachable;
+                zig_args.append(meta.tagName(cross_target.environ)) catch unreachable;
             },
         }
 
@@ -1690,13 +1691,13 @@ pub const TestStep = struct {
             Target.Native => {},
             Target.Cross => |cross_target| {
                 try zig_args.append("--target-arch");
-                try zig_args.append(@tagName(cross_target.arch));
+                try zig_args.append(meta.tagName(cross_target.arch));
 
                 try zig_args.append("--target-os");
-                try zig_args.append(@tagName(cross_target.os));
+                try zig_args.append(meta.tagName(cross_target.os));
 
                 try zig_args.append("--target-environ");
-                try zig_args.append(@tagName(cross_target.environ));
+                try zig_args.append(meta.tagName(cross_target.environ));
             },
         }
 

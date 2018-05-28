@@ -117,15 +117,6 @@ const IntToEnumNumber = enum {
     Four,
 };
 
-test "@tagName" {
-    assert(mem.eql(u8, testEnumTagNameBare(BareNumber.Three), "Three"));
-    comptime assert(mem.eql(u8, testEnumTagNameBare(BareNumber.Three), "Three"));
-}
-
-fn testEnumTagNameBare(n: BareNumber) []const u8 {
-    return @tagName(n);
-}
-
 const BareNumber = enum {
     One,
     Two,

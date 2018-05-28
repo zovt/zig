@@ -1,4 +1,5 @@
 const std = @import("../index.zig");
+const meta = std.meta;
 const mem = std.mem;
 
 pub const Token = struct {
@@ -198,7 +199,7 @@ pub const Tokenizer = struct {
 
     /// For debugging purposes
     pub fn dump(self: &Tokenizer, token: &const Token) void {
-        std.debug.warn("{} \"{}\"\n", @tagName(token.id), self.buffer[token.start..token.end]);
+        std.debug.warn("{} \"{}\"\n", meta.tagName(token.id), self.buffer[token.start..token.end]);
     }
 
     pub fn init(buffer: []const u8) Tokenizer {
@@ -1322,7 +1323,7 @@ fn testTokenize(source: []const u8, expected_tokens: []const Token.Id) void {
     for (expected_tokens) |expected_token_id| {
         const token = tokenizer.next();
         if (@TagType(Token.Id)(token.id) != @TagType(Token.Id)(expected_token_id)) {
-            std.debug.panic("expected {}, found {}\n", @tagName(@TagType(Token.Id)(expected_token_id)), @tagName(@TagType(Token.Id)(token.id)));
+            std.debug.panic("expected {}, found {}\n", meta.tagName(@TagType(Token.Id)(expected_token_id)), meta.tagName(@TagType(Token.Id)(token.id)));
         }
         switch (expected_token_id) {
             Token.Id.StringLiteral => |expected_kind| {

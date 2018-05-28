@@ -1,5 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
+const meta = std.meta;
 const io = std.io;
 const os = std.os;
 const warn = std.debug.warn;
@@ -246,7 +247,7 @@ fn parseError(tokenizer: &Tokenizer, token: &const Token, comptime fmt: []const 
 
 fn assertToken(tokenizer: &Tokenizer, token: &const Token, id: Token.Id) !void {
     if (token.id != id) {
-        return parseError(tokenizer, token, "expected {}, found {}", @tagName(id), @tagName(token.id));
+        return parseError(tokenizer, token, "expected {}, found {}", meta.tagName(id), meta.tagName(token.id));
     }
 }
 

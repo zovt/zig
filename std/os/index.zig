@@ -1241,7 +1241,7 @@ pub const Dir = struct {
             Os.macosx,
             Os.ios => return self.nextDarwin(),
             Os.windows => return self.nextWindows(),
-            else => @compileError("Dir.next not supported on " ++ @tagName(builtin.os)),
+            else => @compileError("Dir.next not supported on " ++ meta.tagName(builtin.os)),
         }
     }
 
@@ -1931,7 +1931,7 @@ pub fn selfExeDirPath(allocator: &mem.Allocator) ![]u8 {
             const dirname = os.path.dirname(self_exe_path);
             return allocator.shrink(u8, self_exe_path, dirname.len);
         },
-        else => @compileError("unimplemented: std.os.selfExeDirPath for " ++ @tagName(builtin.os)),
+        else => @compileError("unimplemented: std.os.selfExeDirPath for " ++ meta.tagName(builtin.os)),
     }
 }
 
