@@ -28,6 +28,7 @@ pub const json = @import("json.zig");
 pub const macho = @import("macho.zig");
 pub const math = @import("math/index.zig");
 pub const mem = @import("mem.zig");
+pub const meta = @import("meta.zig");
 pub const net = @import("net.zig");
 pub const os = @import("os/index.zig");
 pub const rand = @import("rand/index.zig");
@@ -63,6 +64,7 @@ test "std" {
     _ = @import("macho.zig");
     _ = @import("math/index.zig");
     _ = @import("mem.zig");
+    _ = @import("meta.zig");
     _ = @import("net.zig");
     _ = @import("heap.zig");
     _ = @import("os/index.zig");
