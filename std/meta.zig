@@ -10,7 +10,7 @@ const TypeInfo = builtin.TypeInfo;
 
 pub fn tagName(v: var) []const u8 {
     // TODO: We only do this because we dont have https://github.com/ziglang/zig/issues/733
-    const value = if (@typeInfo(@typeOf(v)) == TypeId.Pointer) *v else v;
+    const value = if (@typeInfo(@typeOf(v)) == TypeId.Pointer) v.* else v;
 
     const T = @typeOf(value);
     switch (@typeInfo(T)) {

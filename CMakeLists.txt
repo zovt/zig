@@ -525,6 +525,7 @@ set(ZIG_STD_FILES
     "math/tanh.zig"
     "math/trunc.zig"
     "mem.zig"
+    "meta.zig"
     "net.zig"
     "os/child_process.zig"
     "os/darwin.zig"
