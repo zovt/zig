@@ -691,28 +691,6 @@ static void ir_print_slice(IrPrint *irp, IrInstructionSlice *instruction) {
     fprintf(irp->f, "]");
 }
 
-static void ir_print_member_count(IrPrint *irp, IrInstructionMemberCount *instruction) {
-    fprintf(irp->f, "@memberCount(");
-    ir_print_other_instruction(irp, instruction->container);
-    fprintf(irp->f, ")");
-}
-
-static void ir_print_member_type(IrPrint *irp, IrInstructionMemberType *instruction) {
-    fprintf(irp->f, "@memberType(");
-    ir_print_other_instruction(irp, instruction->container_type);
-    fprintf(irp->f, ", ");
-    ir_print_other_instruction(irp, instruction->member_index);
-    fprintf(irp->f, ")");
-}
-
-static void ir_print_member_name(IrPrint *irp, IrInstructionMemberName *instruction) {
-    fprintf(irp->f, "@memberName(");
-    ir_print_other_instruction(irp, instruction->container_type);
-    fprintf(irp->f, ", ");
-    ir_print_other_instruction(irp, instruction->member_index);
-    fprintf(irp->f, ")");
-}
-
 static void ir_print_breakpoint(IrPrint *irp, IrInstructionBreakpoint *instruction) {
     fprintf(irp->f, "@breakpoint()");
 }
@@ -1426,15 +1404,6 @@ static void ir_print_instruction(IrPrint *irp, IrInstruction *instruction) {
             break;
         case IrInstructionIdSlice:
             ir_print_slice(irp, (IrInstructionSlice *)instruction);
-            break;
-        case IrInstructionIdMemberCount:
-            ir_print_member_count(irp, (IrInstructionMemberCount *)instruction);
-            break;
-        case IrInstructionIdMemberType:
-            ir_print_member_type(irp, (IrInstructionMemberType *)instruction);
-            break;
-        case IrInstructionIdMemberName:
-            ir_print_member_name(irp, (IrInstructionMemberName *)instruction);
             break;
         case IrInstructionIdBreakpoint:
             ir_print_breakpoint(irp, (IrInstructionBreakpoint *)instruction);

@@ -98,8 +98,6 @@ const MyErrSet = error {
 };
 
 fn testErrorSetType() void {
-    assert(@memberCount(MyErrSet) == 2);
-
     const a: MyErrSet!i32 = 5678;
     const b: MyErrSet!i32 = MyErrSet.OutOfMemory;
 

@@ -1915,16 +1915,6 @@ const Small = enum {
 test "@TagType" {
     assert(@TagType(Small) == u2);
 }
-
-// @memberCount tells how many fields an enum has:
-test "@memberCount" {
-    assert(@memberCount(Small) == 4);
-}
-
-// @memberName tells the name of a field in an enum:
-test "@memberName" {
-    assert(mem.eql(u8, @memberName(Small, 1), "Two"));
-}
       {#code_end#}
       {#header_open|extern enum#}
       <p>
@@ -1959,7 +1949,7 @@ test "packed enum" {
 }
       {#code_end#}
       {#header_close#}
-      {#see_also|@memberName|@memberCount|@sizeOf#}
+      {#see_also|@sizeOf#}
       {#header_close#}
       {#header_open|union#}
       {#code_begin|test|union#}
@@ -2056,16 +2046,6 @@ const Small = union {
     B: bool,
     C: u8,
 };
-
-// @memberCount tells how many fields a union has:
-test "@memberCount" {
-    assert(@memberCount(Small) == 3);
-}
-
-// @memberName tells the name of a field in an enum:
-test "@memberName" {
-    assert(mem.eql(u8, @memberName(Small, 1), "B"));
-}
       {#code_end#}
       <p>
       Unions with an enum tag are generated as a struct with a tag field and union field. Zig
@@ -4406,35 +4386,9 @@ fn add(a: i32, b: i32) i32 { return a + b; }
       The result is a compile time constant.
       </p>
       {#header_close#}
-      {#header_open|@memberCount#}
-      <pre><code class="zig">@memberCount(comptime T: type) -&gt; (number literal)</code></pre>
-      <p>
-      This function returns the number of members in a struct, enum, or union type.
-      </p>
-      <p>
-      The result is a compile time constant.
-      </p>
-      <p>
-      It does not include functions, variables, or constants.
-      </p>
-      {#header_close#}
-      {#header_open|@memberName#}
-      <pre><code class="zig">@memberName(comptime T: type, comptime index: usize) -&gt; [N]u8</code></pre>
-      <p>Returns the field name of a struct, union, or enum.</p>
-      <p>
-      The result is a compile time constant.
-      </p>
-      <p>
-      It does not include functions, variables, or constants.
-      </p>
-      {#header_close#}
       {#header_open|@field#}
       <pre><code class="zig">@field(lhs: var, comptime field_name: []const u8) -&gt; (field)</code></pre>
       <p>Preforms field access equivalent to <code>lhs.-&gtfield_name-&lt</code>.</p>
-      {#header_close#}
-      {#header_open|@memberType#}
-      <pre><code class="zig">@memberType(comptime T: type, comptime index: usize) -&gt; type</code></pre>
-      <p>Returns the field type of a struct or union.</p>
       {#header_close#}
       {#header_open|@memcpy#}
       <pre><code class="zig">@memcpy(noalias dest: &u8, noalias source: &const u8, byte_count: usize)</code></pre>

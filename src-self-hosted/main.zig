@@ -718,48 +718,45 @@ fn cmdFmt(allocator: &Allocator, args: []const []const u8) !void {
 fn cmdTargets(allocator: &Allocator, args: []const []const u8) !void {
     try stdout.write("Architectures:\n");
     {
-        comptime var i: usize = 0;
-        inline while (i < @memberCount(builtin.Arch)) : (i += 1) {
-            comptime const arch_tag = @memberName(builtin.Arch, i);
-            // NOTE: Cannot use empty string, see #918.
+        const archs = comptime meta.fields(builtin.Arch);
+        inline for (archs) |arch| {
             const tag_name = comptime blk: {
                 // TODO: Figure out why we need more than 10000 to eval this...
                 @setEvalBranchQuota(15000);
                 break :blk meta.tagName(builtin.arch);
             };
 
+            // NOTE: Cannot use empty string, see #918.
             comptime const native_str =
-                if (comptime mem.eql(u8, arch_tag, tag_name)) " (native)\n" else "\n";
+                if (comptime mem.eql(u8, arch.name, tag_name)) " (native)\n" else "\n";
 
-            try stdout.print("  {}{}", arch_tag, native_str);
+            try stdout.print("  {}{}", arch.name, native_str);
         }
     }
     try stdout.write("\n");
 
     try stdout.write("Operating Systems:\n");
     {
-        comptime var i: usize = 0;
-        inline while (i < @memberCount(builtin.Os)) : (i += 1) {
-            comptime const os_tag = @memberName(builtin.Os, i);
+        const systems = comptime meta.fields(builtin.Os);
+        inline for (systems) |system| {
             // NOTE: Cannot use empty string, see #918.
             comptime const native_str =
-                if (comptime mem.eql(u8, os_tag, meta.tagName(builtin.os))) " (native)\n" else "\n";
+                if (comptime mem.eql(u8, system.name, meta.tagName(builtin.os))) " (native)\n" else "\n";
 
-            try stdout.print("  {}{}", os_tag, native_str);
+            try stdout.print("  {}{}", system.name, native_str);
         }
     }
     try stdout.write("\n");
 
     try stdout.write("Environments:\n");
     {
-        comptime var i: usize = 0;
-        inline while (i < @memberCount(builtin.Environ)) : (i += 1) {
-            comptime const environ_tag = @memberName(builtin.Environ, i);
+        const envs = comptime meta.fields(builtin.Environ);
+        inline for (envs) |env| {
             // NOTE: Cannot use empty string, see #918.
             comptime const native_str =
-                if (comptime mem.eql(u8, environ_tag, meta.tagName(builtin.environ))) " (native)\n" else "\n";
+                if (comptime mem.eql(u8, env.name, meta.tagName(builtin.environ))) " (native)\n" else "\n";
 
-            try stdout.print("  {}{}", environ_tag, native_str);
+            try stdout.print("  {}{}", env.name, native_str);
         }
     }
 }
