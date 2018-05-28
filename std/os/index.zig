@@ -1,5 +1,6 @@
 const std = @import("../index.zig");
 const builtin = @import("builtin");
+const meta = std.meta;
 const Os = builtin.Os;
 const is_windows = builtin.os == Os.windows;
 const is_posix = switch (builtin.os) {
@@ -2479,7 +2480,7 @@ pub fn spawnThread(context: var, comptime startFn: var) SpawnThreadError!*Thread
     const default_stack_size = 8 * 1024 * 1024;
 
     const Context = @typeOf(context);
-    comptime assert(@ArgType(@typeOf(startFn), 0) == Context);
+    comptime assert(meta.args(@typeOf(startFn))[0].arg_type == Context);
 
     if (builtin.os == builtin.Os.windows) {
         const WinThread = struct {

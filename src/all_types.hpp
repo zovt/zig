@@ -1354,7 +1354,6 @@ enum BuiltinFnId {
     BuiltinFnIdAlignCast,
     BuiltinFnIdOpaqueType,
     BuiltinFnIdSetAlignStack,
-    BuiltinFnIdArgType,
     BuiltinFnIdExport,
     BuiltinFnIdErrorReturnTrace,
     BuiltinFnIdAtomicRmw,
@@ -2058,7 +2057,6 @@ enum IrInstructionId {
     IrInstructionIdAlignCast,
     IrInstructionIdOpaqueType,
     IrInstructionIdSetAlignStack,
-    IrInstructionIdArgType,
     IrInstructionIdExport,
     IrInstructionIdErrorReturnTrace,
     IrInstructionIdErrorUnion,
@@ -2916,13 +2914,6 @@ struct IrInstructionSetAlignStack {
     IrInstruction base;
 
     IrInstruction *align_bytes;
-};
-
-struct IrInstructionArgType {
-    IrInstruction base;
-
-    IrInstruction *fn_type;
-    IrInstruction *arg_index;
 };
 
 struct IrInstructionExport {

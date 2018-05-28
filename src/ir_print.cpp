@@ -1006,14 +1006,6 @@ static void ir_print_set_align_stack(IrPrint *irp, IrInstructionSetAlignStack *i
     fprintf(irp->f, ")");
 }
 
-static void ir_print_arg_type(IrPrint *irp, IrInstructionArgType *instruction) {
-    fprintf(irp->f, "@ArgType(");
-    ir_print_other_instruction(irp, instruction->fn_type);
-    fprintf(irp->f, ",");
-    ir_print_other_instruction(irp, instruction->arg_index);
-    fprintf(irp->f, ")");
-}
-
 static void ir_print_enum_tag_type(IrPrint *irp, IrInstructionTagType *instruction) {
     fprintf(irp->f, "@TagType(");
     ir_print_other_instruction(irp, instruction->target);
@@ -1559,9 +1551,6 @@ static void ir_print_instruction(IrPrint *irp, IrInstruction *instruction) {
             break;
         case IrInstructionIdSetAlignStack:
             ir_print_set_align_stack(irp, (IrInstructionSetAlignStack *)instruction);
-            break;
-        case IrInstructionIdArgType:
-            ir_print_arg_type(irp, (IrInstructionArgType *)instruction);
             break;
         case IrInstructionIdTagType:
             ir_print_enum_tag_type(irp, (IrInstructionTagType *)instruction);
