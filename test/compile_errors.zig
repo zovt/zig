@@ -352,17 +352,7 @@ pub fn addCases(cases: *tests.CompileErrorContext) void {
         ".tmp_source.zig:5:17: error: integer value 2 represents no error in 'Set2'",
     );
 
-    cases.add(
-        "@memberCount of error",
-        \\comptime {
-        \\    _ = @memberCount(error);
-        \\}
-    ,
-        ".tmp_source.zig:2:9: error: global error set member count not available at comptime",
-    );
-
-    cases.add(
-        "duplicate error value in error set",
+    cases.add("duplicate error value in error set",
         \\const Foo = error {
         \\    Bar,
         \\    Bar,
@@ -3417,85 +3407,7 @@ pub fn addCases(cases: *tests.CompileErrorContext) void {
         ".tmp_source.zig:2:1: error: invalid character: '\\t'",
     );
 
-    cases.add("@memberType on unsupported type",
-        \\comptime {
-        \\    _ = @memberType(i32, 0);
-        \\}
-    ,
-        ".tmp_source.zig:2:21: error: type 'i32' does not support @memberType",
-    );
-
-    cases.add(
-        "@memberType on enum",
-        \\comptime {
-        \\    _ = @memberType(Foo, 0);
-        \\}
-        \\const Foo = enum {A,};
-    ,
-        ".tmp_source.zig:2:21: error: type 'Foo' does not support @memberType",
-    );
-
-    cases.add(
-        "@memberType struct out of bounds",
-        \\comptime {
-        \\    _ = @memberType(Foo, 0);
-        \\}
-        \\const Foo = struct {};
-    ,
-        ".tmp_source.zig:2:26: error: member index 0 out of bounds; 'Foo' has 0 members",
-    );
-
-    cases.add(
-        "@memberType union out of bounds",
-        \\comptime {
-        \\    _ = @memberType(Foo, 1);
-        \\}
-        \\const Foo = union {A: void,};
-    ,
-        ".tmp_source.zig:2:26: error: member index 1 out of bounds; 'Foo' has 1 members",
-    );
-
-    cases.add(
-        "@memberName on unsupported type",
-        \\comptime {
-        \\    _ = @memberName(i32, 0);
-        \\}
-    ,
-        ".tmp_source.zig:2:21: error: type 'i32' does not support @memberName",
-    );
-
-    cases.add(
-        "@memberName struct out of bounds",
-        \\comptime {
-        \\    _ = @memberName(Foo, 0);
-        \\}
-        \\const Foo = struct {};
-    ,
-        ".tmp_source.zig:2:26: error: member index 0 out of bounds; 'Foo' has 0 members",
-    );
-
-    cases.add(
-        "@memberName enum out of bounds",
-        \\comptime {
-        \\    _ = @memberName(Foo, 1);
-        \\}
-        \\const Foo = enum {A,};
-    ,
-        ".tmp_source.zig:2:26: error: member index 1 out of bounds; 'Foo' has 1 members",
-    );
-
-    cases.add(
-        "@memberName union out of bounds",
-        \\comptime {
-        \\    _ = @memberName(Foo, 1);
-        \\}
-        \\const Foo = union {A:i32,};
-    ,
-        ".tmp_source.zig:2:26: error: member index 1 out of bounds; 'Foo' has 1 members",
-    );
-
-    cases.add(
-        "calling var args extern function, passing array instead of pointer",
+    cases.add("calling var args extern function, passing array instead of pointer",
         \\export fn entry() void {
         \\    foo("hello",);
         \\}

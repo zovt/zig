@@ -12,8 +12,6 @@ test "enum type" {
     const bar = Bar.B;
 
     assert(bar == Bar.B);
-    assert(@memberCount(Foo) == 3);
-    assert(@memberCount(Bar) == 4);
     assert(@sizeOf(Foo) == @sizeOf(FooNoVoid));
     assert(@sizeOf(Bar) == 1);
 }

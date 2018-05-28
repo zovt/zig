@@ -329,10 +329,10 @@ pub const Node = struct {
     }
 
     pub fn iterate(base: *Node, index: usize) ?*Node {
-        comptime var i = 0;
-        inline while (i < @memberCount(Id)) : (i += 1) {
-            if (base.id == @field(Id, @memberName(Id, i))) {
-                const T = @field(Node, @memberName(Id, i));
+        const ids = comptime meta.fields(Id);
+        inline for (ids) |id| {
+            if (base.id == @field(Id, id.name)) {
+                const T = @field(Node, id.name);
                 return @fieldParentPtr(T, "base", base).iterate(index);
             }
         }
@@ -340,10 +340,10 @@ pub const Node = struct {
     }
 
     pub fn firstToken(base: *Node) TokenIndex {
-        comptime var i = 0;
-        inline while (i < @memberCount(Id)) : (i += 1) {
-            if (base.id == @field(Id, @memberName(Id, i))) {
-                const T = @field(Node, @memberName(Id, i));
+        const ids = comptime meta.fields(Id);
+        inline for (ids) |id| {
+            if (base.id == @field(Id, id.name)) {
+                const T = @field(Node, id.name);
                 return @fieldParentPtr(T, "base", base).firstToken();
             }
         }
@@ -351,10 +351,10 @@ pub const Node = struct {
     }
 
     pub fn lastToken(base: *Node) TokenIndex {
-        comptime var i = 0;
-        inline while (i < @memberCount(Id)) : (i += 1) {
-            if (base.id == @field(Id, @memberName(Id, i))) {
-                const T = @field(Node, @memberName(Id, i));
+        const ids = comptime meta.fields(Id);
+        inline for (ids) |id| {
+            if (base.id == @field(Id, id.name)) {
+                const T = @field(Node, id.name);
                 return @fieldParentPtr(T, "base", base).lastToken();
             }
         }
@@ -362,10 +362,10 @@ pub const Node = struct {
     }
 
     pub fn typeToId(comptime T: type) Id {
-        comptime var i = 0;
-        inline while (i < @memberCount(Id)) : (i += 1) {
-            if (T == @field(Node, @memberName(Id, i))) {
-                return @field(Id, @memberName(Id, i));
+        const ids = comptime meta.fields(Id);
+        inline for (ids) |id| {
+            if (T == @field(Node, id.name)) {
+                return @field(Id, id.name);
             }
         }
         unreachable;

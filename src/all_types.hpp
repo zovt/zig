@@ -1295,9 +1295,6 @@ enum BuiltinFnId {
     BuiltinFnIdAlignOf,
     BuiltinFnIdMaxValue,
     BuiltinFnIdMinValue,
-    BuiltinFnIdMemberCount,
-    BuiltinFnIdMemberType,
-    BuiltinFnIdMemberName,
     BuiltinFnIdField,
     BuiltinFnIdTypeInfo,
     BuiltinFnIdTypeof,
@@ -2016,9 +2013,6 @@ enum IrInstructionId {
     IrInstructionIdMemset,
     IrInstructionIdMemcpy,
     IrInstructionIdSlice,
-    IrInstructionIdMemberCount,
-    IrInstructionIdMemberType,
-    IrInstructionIdMemberName,
     IrInstructionIdBreakpoint,
     IrInstructionIdReturnAddress,
     IrInstructionIdFrameAddress,
@@ -2637,26 +2631,6 @@ struct IrInstructionSlice {
     IrInstruction *end;
     bool safety_check_on;
     LLVMValueRef tmp_ptr;
-};
-
-struct IrInstructionMemberCount {
-    IrInstruction base;
-
-    IrInstruction *container;
-};
-
-struct IrInstructionMemberType {
-    IrInstruction base;
-
-    IrInstruction *container_type;
-    IrInstruction *member_index;
-};
-
-struct IrInstructionMemberName {
-    IrInstruction base;
-
-    IrInstruction *container_type;
-    IrInstruction *member_index;
 };
 
 struct IrInstructionBreakpoint {
