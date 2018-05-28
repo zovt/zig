@@ -2735,21 +2735,6 @@ pub fn addCases(cases: &tests.CompileErrorContext) void {
     ,
         ".tmp_source.zig:2:1: error: invalid character: '\\t'");
 
-    cases.add("@ArgType given non function parameter",
-        \\comptime {
-        \\    _ = @ArgType(i32, 3);
-        \\}
-    ,
-        ".tmp_source.zig:2:18: error: expected function, found 'i32'");
-
-    cases.add("@ArgType arg index out of bounds",
-        \\comptime {
-        \\    _ = @ArgType(@typeOf(add), 2);
-        \\}
-        \\fn add(a: i32, b: i32) i32 { return a + b; }
-    ,
-        ".tmp_source.zig:2:32: error: arg index 2 out of bounds; 'fn(i32, i32) i32' has 2 arguments");
-
     cases.add("@memberType on unsupported type",
         \\comptime {
         \\    _ = @memberType(i32, 0);
@@ -3229,12 +3214,4 @@ pub fn addCases(cases: &tests.CompileErrorContext) void {
         \\}
     ,
         ".tmp_source.zig:3:25: error: ReturnType has not been resolved because 'fn(var)var' is generic");
-
-    cases.add("getting @ArgType of generic function",
-        \\fn generic(a: var) void {}
-        \\comptime {
-        \\    _ = @ArgType(@typeOf(generic), 0);
-        \\}
-    ,
-        ".tmp_source.zig:3:36: error: @ArgType could not resolve the type of arg 0 because 'fn(var)var' is generic");
 }

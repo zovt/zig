@@ -4603,7 +4603,6 @@ static LLVMValueRef ir_render_instruction(CodeGen *g, IrExecutable *executable, 
         case IrInstructionIdPtrTypeOf:
         case IrInstructionIdOpaqueType:
         case IrInstructionIdSetAlignStack:
-        case IrInstructionIdArgType:
         case IrInstructionIdTagType:
         case IrInstructionIdExport:
         case IrInstructionIdErrorUnion:
@@ -6273,7 +6272,6 @@ static void define_builtin_fns(CodeGen *g) {
     create_builtin_fn(g, BuiltinFnIdAlignCast, "alignCast", 2);
     create_builtin_fn(g, BuiltinFnIdOpaqueType, "OpaqueType", 0);
     create_builtin_fn(g, BuiltinFnIdSetAlignStack, "setAlignStack", 1);
-    create_builtin_fn(g, BuiltinFnIdArgType, "ArgType", 2);
     create_builtin_fn(g, BuiltinFnIdExport, "export", 3);
     create_builtin_fn(g, BuiltinFnIdErrorReturnTrace, "errorReturnTrace", 0);
     create_builtin_fn(g, BuiltinFnIdAtomicRmw, "atomicRmw", 5);

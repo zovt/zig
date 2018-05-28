@@ -3918,18 +3918,6 @@ pub fn main() void {
       If no overflow or underflow occurs, returns <code>false</code>.
       </p>
       {#header_close#}
-      {#header_open|@ArgType#}
-      <pre><code class="zig">@ArgType(comptime T: type, comptime n: usize) -&gt; type</code></pre>
-      <p>
-      This builtin function takes a function type and returns the type of the parameter at index <code>n</code>.
-      </p>
-      <p>
-      <code>T</code> must be a function type.
-      </p>
-      <p>
-      Note: This function is deprecated. Use {#link|@typeInfo#} instead.
-      </p>
-      {#header_close#}
       {#header_open|@atomicLoad#}
       <pre><code class="zig">@atomicLoad(comptime T: type, ptr: &amp;const T, comptime ordering: builtin.AtomicOrder) -&gt; T</code></pre>
       <p>

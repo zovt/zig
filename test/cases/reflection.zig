@@ -17,9 +17,6 @@ test "reflection: function return type, var args, and param types" {
         assert(!@typeOf(dummy).is_var_args);
         assert(@typeOf(dummy_varargs).is_var_args);
         assert(@typeOf(dummy).arg_count == 3);
-        assert(@ArgType(@typeOf(dummy), 0) == bool);
-        assert(@ArgType(@typeOf(dummy), 1) == i32);
-        assert(@ArgType(@typeOf(dummy), 2) == f32);
     }
 }
 
