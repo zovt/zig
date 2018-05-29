@@ -15,21 +15,21 @@ pub fn tagName(v: var) []const u8 {
     const T = @typeOf(value);
     switch (@typeInfo(T)) {
         TypeId.Enum => |info| {
-            const TagType = info.tag_type;
+            const Tag = info.tag_type;
             inline for (info.fields) |field| {
-                if (field.value == TagType(value)) return field.name;
+                if (field.value == Tag(value)) return field.name;
             }
 
             unreachable;
         },
         TypeId.Union => |info| {
-            const UnionTagType = info.tag_type;
-            if (UnionTagType == @typeOf(undefined))
+            const UnionTag = info.tag_type;
+            if (UnionTag == @typeOf(undefined))
                 @compileError("union has no associated enum");
 
-            const TagType = @typeInfo(UnionTagType).Enum.tag_type;
+            const Tag = @typeInfo(UnionTag).Enum.tag_type;
             inline for (info.fields) |field| {
-                if ((??field.enum_field).value == TagType(UnionTagType(value)))
+                if ((??field.enum_field).value == Tag(UnionTag(value)))
                     return field.name;
             }
 
@@ -84,10 +84,10 @@ test "std.meta.tagName" {
 pub fn maxValue(comptime T: type) T {
     switch (@typeInfo(T)) {
         TypeId.Enum => |info| {
-            const TagType = info.tag_type;
-            var max = TagType(info.fields[0].value);
+            const Tag = info.tag_type;
+            var max = Tag(info.fields[0].value);
             inline for (info.fields[1..]) |field| {
-                if (max < field.value) max = TagType(field.value);
+                if (max < field.value) max = Tag(field.value);
             }
 
             return T(max);
@@ -125,10 +125,10 @@ test "std.meta.maxValue" {
 pub fn minValue(comptime T: type) T {
     switch (@typeInfo(T)) {
         TypeId.Enum => |info| {
-            const TagType = info.tag_type;
-            var min = TagType(info.fields[0].value);
+            const Tag = info.tag_type;
+            var min = Tag(info.fields[0].value);
             inline for (info.fields[1..]) |field| {
-                if (min > field.value) min = TagType(field.value);
+                if (min > field.value) min = Tag(field.value);
             }
 
             return T(min);
@@ -533,11 +533,33 @@ pub fn args(comptime T: type) []TypeInfo.FnArg {
     return info.args;
 }
 
-test "std.meta.AsyncAllocatorType" {
+test "std.meta.args" {
     const aargs = comptime args(fn(u8) void);
 
     debug.assert(aargs.len == 1);
     debug.assert(comptime aargs[0].arg_type == u8);
     debug.assert(!aargs[0].is_generic);
     debug.assert(!aargs[0].is_noalias);
+}
+
+pub fn TagType(comptime T: type) type {
+    return switch (@typeInfo(T)) {
+        TypeId.Enum => |info| return info.tag_type,
+        TypeId.Union => |info| return info.tag_type,
+        else => @compileError("expected enum or union type, found '" ++ @typeName(T) ++ "'"),
+    };
+}
+
+test "std.meta.TagType" {
+    const E = enum(u8) {
+        C = 33,
+        D,
+    };
+    const U = union(E) {
+        C: u8,
+        D: u16,
+    };
+
+    debug.assert(TagType(E) == u8);
+    debug.assert(TagType(U) == E);
 }
