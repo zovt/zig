@@ -124,50 +124,50 @@ pub const Error = union(enum) {
     pub fn render(self: *const Error, tokens: *Tree.TokenList, stream: var) !void {
         switch (self.*) {
             // TODO https://github.com/ziglang/zig/issues/683
-            @TagType(Error).InvalidToken => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedVarDeclOrFn => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedAggregateKw => |*x| return x.render(tokens, stream),
-            @TagType(Error).UnattachedDocComment => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedEqOrSemi => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedSemiOrLBrace => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedColonOrRParen => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedLabelable => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedInlinable => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedAsmOutputReturnOrType => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedCall => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedCallOrFnProto => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedSliceOrRBracket => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExtraAlignQualifier => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExtraConstQualifier => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExtraVolatileQualifier => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedPrimaryExpr => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedToken => |*x| return x.render(tokens, stream),
-            @TagType(Error).ExpectedCommaOrEnd => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).InvalidToken => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedVarDeclOrFn => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedAggregateKw => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).UnattachedDocComment => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedEqOrSemi => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedSemiOrLBrace => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedColonOrRParen => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedLabelable => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedInlinable => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedAsmOutputReturnOrType => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedCall => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedCallOrFnProto => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedSliceOrRBracket => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExtraAlignQualifier => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExtraConstQualifier => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExtraVolatileQualifier => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedPrimaryExpr => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedToken => |*x| return x.render(tokens, stream),
+            meta.TagType(Error).ExpectedCommaOrEnd => |*x| return x.render(tokens, stream),
         }
     }
 
     pub fn loc(self: *const Error) TokenIndex {
         switch (self.*) {
             // TODO https://github.com/ziglang/zig/issues/683
-            @TagType(Error).InvalidToken => |x| return x.token,
-            @TagType(Error).ExpectedVarDeclOrFn => |x| return x.token,
-            @TagType(Error).ExpectedAggregateKw => |x| return x.token,
-            @TagType(Error).UnattachedDocComment => |x| return x.token,
-            @TagType(Error).ExpectedEqOrSemi => |x| return x.token,
-            @TagType(Error).ExpectedSemiOrLBrace => |x| return x.token,
-            @TagType(Error).ExpectedColonOrRParen => |x| return x.token,
-            @TagType(Error).ExpectedLabelable => |x| return x.token,
-            @TagType(Error).ExpectedInlinable => |x| return x.token,
-            @TagType(Error).ExpectedAsmOutputReturnOrType => |x| return x.token,
-            @TagType(Error).ExpectedCall => |x| return x.node.firstToken(),
-            @TagType(Error).ExpectedCallOrFnProto => |x| return x.node.firstToken(),
-            @TagType(Error).ExpectedSliceOrRBracket => |x| return x.token,
-            @TagType(Error).ExtraAlignQualifier => |x| return x.token,
-            @TagType(Error).ExtraConstQualifier => |x| return x.token,
-            @TagType(Error).ExtraVolatileQualifier => |x| return x.token,
-            @TagType(Error).ExpectedPrimaryExpr => |x| return x.token,
-            @TagType(Error).ExpectedToken => |x| return x.token,
-            @TagType(Error).ExpectedCommaOrEnd => |x| return x.token,
+            meta.TagType(Error).InvalidToken => |x| return x.token,
+            meta.TagType(Error).ExpectedVarDeclOrFn => |x| return x.token,
+            meta.TagType(Error).ExpectedAggregateKw => |x| return x.token,
+            meta.TagType(Error).UnattachedDocComment => |x| return x.token,
+            meta.TagType(Error).ExpectedEqOrSemi => |x| return x.token,
+            meta.TagType(Error).ExpectedSemiOrLBrace => |x| return x.token,
+            meta.TagType(Error).ExpectedColonOrRParen => |x| return x.token,
+            meta.TagType(Error).ExpectedLabelable => |x| return x.token,
+            meta.TagType(Error).ExpectedInlinable => |x| return x.token,
+            meta.TagType(Error).ExpectedAsmOutputReturnOrType => |x| return x.token,
+            meta.TagType(Error).ExpectedCall => |x| return x.node.firstToken(),
+            meta.TagType(Error).ExpectedCallOrFnProto => |x| return x.node.firstToken(),
+            meta.TagType(Error).ExpectedSliceOrRBracket => |x| return x.token,
+            meta.TagType(Error).ExtraAlignQualifier => |x| return x.token,
+            meta.TagType(Error).ExtraConstQualifier => |x| return x.token,
+            meta.TagType(Error).ExtraVolatileQualifier => |x| return x.token,
+            meta.TagType(Error).ExpectedPrimaryExpr => |x| return x.token,
+            meta.TagType(Error).ExpectedToken => |x| return x.token,
+            meta.TagType(Error).ExpectedCommaOrEnd => |x| return x.token,
         }
     }
 
@@ -192,7 +192,7 @@ pub const Error = union(enum) {
         node: *Node,
 
         pub fn render(self: *const ExpectedCall, tokens: *Tree.TokenList, stream: var) !void {
-            return stream.print("expected " ++ comptime meta.tagName(@TagType(Node.SuffixOp.Op).Call) ++ ", found {}", meta.tagName(self.node.id));
+            return stream.print("expected " ++ comptime meta.tagName(meta.TagType(Node.SuffixOp.Op).Call) ++ ", found {}", meta.tagName(self.node.id));
         }
     };
 
@@ -200,13 +200,13 @@ pub const Error = union(enum) {
         node: *Node,
 
         pub fn render(self: *const ExpectedCallOrFnProto, tokens: *Tree.TokenList, stream: var) !void {
-            return stream.print("expected " ++ comptime meta.tagName(@TagType(Node.SuffixOp.Op).Call) ++ " or " ++ meta.tagName(Node.Id.FnProto) ++ ", found {}", meta.tagName(self.node.id));
+            return stream.print("expected " ++ comptime meta.tagName(meta.TagType(Node.SuffixOp.Op).Call) ++ " or " ++ meta.tagName(Node.Id.FnProto) ++ ", found {}", meta.tagName(self.node.id));
         }
     };
 
     pub const ExpectedToken = struct {
         token: TokenIndex,
-        expected_id: @TagType(Token.Id),
+        expected_id: meta.TagType(Token.Id),
 
         pub fn render(self: *const ExpectedToken, tokens: *Tree.TokenList, stream: var) !void {
             const token_name = meta.tagName(tokens.at(self.token).id);
@@ -216,7 +216,7 @@ pub const Error = union(enum) {
 
     pub const ExpectedCommaOrEnd = struct {
         token: TokenIndex,
-        end_id: @TagType(Token.Id),
+        end_id: meta.TagType(Token.Id),
 
         pub fn render(self: *const ExpectedCommaOrEnd, tokens: *Tree.TokenList, stream: var) !void {
             const token_name = meta.tagName(tokens.at(self.token).id);
@@ -1643,7 +1643,7 @@ pub const Node = struct {
             i -= 1;
 
             switch (self.op) {
-                @TagType(Op).Call => |*call_info| {
+                meta.TagType(Op).Call => |*call_info| {
                     if (i < call_info.params.len) return call_info.params.at(i).*;
                     i -= call_info.params.len;
                 },
@@ -1651,7 +1651,7 @@ pub const Node = struct {
                     if (i < 1) return index_expr;
                     i -= 1;
                 },
-                @TagType(Op).Slice => |range| {
+                meta.TagType(Op).Slice => |range| {
                     if (i < 1) return range.start;
                     i -= 1;
 
@@ -1676,7 +1676,7 @@ pub const Node = struct {
 
         pub fn firstToken(self: *SuffixOp) TokenIndex {
             switch (self.op) {
-                @TagType(Op).Call => |*call_info| if (call_info.async_attr) |async_attr| return async_attr.firstToken(),
+                meta.TagType(Op).Call => |*call_info| if (call_info.async_attr) |async_attr| return async_attr.firstToken(),
                 else => {},
             }
             return self.lhs.firstToken();

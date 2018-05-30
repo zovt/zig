@@ -3594,43 +3594,6 @@ pub fn addCases(cases: *tests.CompileErrorContext) void {
     );
 
     cases.add(
-        "@TagType when union has no attached enum",
-        \\const Foo = union {
-        \\    A: i32,
-        \\};
-        \\export fn entry() void {
-        \\    const x = @TagType(Foo);
-        \\}
-    ,
-        ".tmp_source.zig:5:24: error: union 'Foo' has no tag",
-        ".tmp_source.zig:1:13: note: consider 'union(enum)' here",
-    );
-
-    cases.add(
-        "non-integer tag type to automatic union enum",
-        \\const Foo = union(enum(f32)) {
-        \\    A: i32,
-        \\};
-        \\export fn entry() void {
-        \\    const x = @TagType(Foo);
-        \\}
-    ,
-        ".tmp_source.zig:1:23: error: expected integer tag type, found 'f32'",
-    );
-
-    cases.add(
-        "non-enum tag type passed to union",
-        \\const Foo = union(u32) {
-        \\    A: i32,
-        \\};
-        \\export fn entry() void {
-        \\    const x = @TagType(Foo);
-        \\}
-    ,
-        ".tmp_source.zig:1:18: error: expected enum tag type, found 'u32'",
-    );
-
-    cases.add(
         "union auto-enum value already taken",
         \\const MultipleChoice = union(enum(u32)) {
         \\    A = 20,

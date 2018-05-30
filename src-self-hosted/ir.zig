@@ -95,8 +95,6 @@ pub const Instruction = struct {
         CanImplicitCast,
         DeclRef,
         Panic,
-        TagName,
-        TagType,
         FieldParentPtr,
         OffsetOf,
         TypeId,

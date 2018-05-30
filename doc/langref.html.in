@@ -1904,17 +1904,6 @@ test "enum variant switch" {
     };
     assert(mem.eql(u8, what_is_it, "this is a number"));
 }
-
-// @TagType can be used to access the integer tag type of an enum.
-const Small = enum {
-    One,
-    Two,
-    Three,
-    Four,
-};
-test "@TagType" {
-    assert(@TagType(Small) == u2);
-}
       {#code_end#}
       {#header_open|extern enum#}
       <p>
@@ -1982,11 +1971,6 @@ const ComplexType = union(ComplexTypeTag) {
 test "declare union value" {
     const c = ComplexType { .Ok = 0 };
     assert(ComplexTypeTag(c) == ComplexTypeTag.Ok);
-}
-
-// @TagType can be used to access the enum tag type of a union.
-test "@TagType" {
-    assert(@TagType(ComplexType) == ComplexTypeTag);
 }
 
 // Unions can be made to infer the enum tag type.
@@ -4259,15 +4243,6 @@ test "main" {
       <pre><code class="zig">@export(comptime name: []const u8, target: var, linkage: builtin.GlobalLinkage) []const u8</code></pre>
       <p>
       Creates a symbol in the output object file.
-      </p>
-      {#header_close#}
-      {#header_open|@TagType#}
-      <pre><code class="zig">@TagType(T: type) type</code></pre>
-      <p>
-      For an enum, returns the integer type that is used to store the enumeration value.
-      </p>
-      <p>
-      For a union, returns the enum type that is used to store the tag value.
       </p>
       {#header_close#}
       {#header_open|@errorName#}

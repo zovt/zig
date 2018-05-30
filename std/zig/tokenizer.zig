@@ -1307,8 +1307,8 @@ fn testTokenize(source: []const u8, expected_tokens: []const Token.Id) void {
     var tokenizer = Tokenizer.init(source);
     for (expected_tokens) |expected_token_id| {
         const token = tokenizer.next();
-        if (@TagType(Token.Id)(token.id) != @TagType(Token.Id)(expected_token_id)) {
-            std.debug.panic("expected {}, found {}\n", meta.tagName(@TagType(Token.Id)(expected_token_id)), meta.tagName(@TagType(Token.Id)(token.id)));
+        if (meta.TagType(Token.Id)(token.id) != meta.TagType(Token.Id)(expected_token_id)) {
+            std.debug.panic("expected {}, found {}\n", meta.tagName(meta.TagType(Token.Id)(expected_token_id)), meta.tagName(meta.TagType(Token.Id)(token.id)));
         }
         switch (expected_token_id) {
             Token.Id.StringLiteral => |expected_kind| {

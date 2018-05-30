@@ -3,6 +3,7 @@
 // https://tools.ietf.org/html/rfc8259
 
 const std = @import("index.zig");
+const meta = std.meta;
 const mem = std.mem;
 
 const u1 = @IntType(false, 1);
@@ -176,7 +177,7 @@ pub const StreamingJsonParser = struct {
         // Only call this function to generate array/object final state.
         pub fn fromInt(x: var) State {
             std.debug.assert(x == 0 or x == 1);
-            const T = @TagType(State);
+            const T = meta.TagType(State);
             return State(T(x));
         }
     };

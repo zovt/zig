@@ -126,7 +126,7 @@ const MultipleChoice = union(enum(u32)) {
 test "simple union(enum(u32))" {
     var x = MultipleChoice.C;
     assert(x == MultipleChoice.C);
-    assert(u32(@TagType(MultipleChoice)(x)) == 60);
+    assert(u32(@typeInfo(MultipleChoice).Union.tag_type(x)) == 60);
 }
 
 const MultipleChoice2 = union(enum(u32)) {
@@ -142,13 +142,13 @@ const MultipleChoice2 = union(enum(u32)) {
 };
 
 test "union(enum(u32)) with specified and unspecified tag values" {
-    comptime assert(@TagType(@TagType(MultipleChoice2)) == u32);
+    comptime assert(@typeInfo(@typeInfo(MultipleChoice2).Union.tag_type).Enum.tag_type == u32);
     testEnumWithSpecifiedAndUnspecifiedTagValues(MultipleChoice2{ .C = 123 });
     comptime testEnumWithSpecifiedAndUnspecifiedTagValues(MultipleChoice2{ .C = 123 });
 }
 
 fn testEnumWithSpecifiedAndUnspecifiedTagValues(x: *const MultipleChoice2) void {
-    assert(u32(@TagType(MultipleChoice2)(x.*)) == 60);
+    assert(u32(@typeInfo(MultipleChoice2).Union.tag_type(x.*)) == 60);
     assert(1123 == switch (x.*) {
         MultipleChoice2.A => 1,
         MultipleChoice2.B => 2,
