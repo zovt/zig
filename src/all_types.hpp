@@ -1339,7 +1339,6 @@ enum BuiltinFnId {
     BuiltinFnIdPtrToInt,
     BuiltinFnIdTagType,
     BuiltinFnIdFieldParentPtr,
-    BuiltinFnIdOffsetOf,
     BuiltinFnIdInlineCall,
     BuiltinFnIdNoInlineCall,
     BuiltinFnIdNewStackCall,
@@ -2041,7 +2040,6 @@ enum IrInstructionId {
     IrInstructionIdPanic,
     IrInstructionIdTagType,
     IrInstructionIdFieldParentPtr,
-    IrInstructionIdOffsetOf,
     IrInstructionIdTypeInfo,
     IrInstructionIdTypeId,
     IrInstructionIdSetEvalBranchQuota,
@@ -2838,13 +2836,6 @@ struct IrInstructionFieldParentPtr {
     IrInstruction *field_name;
     IrInstruction *field_ptr;
     TypeStructField *field;
-};
-
-struct IrInstructionOffsetOf {
-    IrInstruction base;
-
-    IrInstruction *type_value;
-    IrInstruction *field_name;
 };
 
 struct IrInstructionTypeInfo {

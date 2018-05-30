@@ -4563,7 +4563,6 @@ static LLVMValueRef ir_render_instruction(CodeGen *g, IrExecutable *executable, 
         case IrInstructionIdCanImplicitCast:
         case IrInstructionIdDeclRef:
         case IrInstructionIdSwitchVar:
-        case IrInstructionIdOffsetOf:
         case IrInstructionIdTypeInfo:
         case IrInstructionIdTypeId:
         case IrInstructionIdSetEvalBranchQuota:
@@ -6216,7 +6215,6 @@ static void define_builtin_fns(CodeGen *g) {
     create_builtin_fn(g, BuiltinFnIdPtrToInt, "ptrToInt", 1);
     create_builtin_fn(g, BuiltinFnIdTagType, "TagType", 1);
     create_builtin_fn(g, BuiltinFnIdFieldParentPtr, "fieldParentPtr", 3);
-    create_builtin_fn(g, BuiltinFnIdOffsetOf, "offsetOf", 2);
     create_builtin_fn(g, BuiltinFnIdDivExact, "divExact", 2);
     create_builtin_fn(g, BuiltinFnIdDivTrunc, "divTrunc", 2);
     create_builtin_fn(g, BuiltinFnIdDivFloor, "divFloor", 2);
