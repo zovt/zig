@@ -3913,7 +3913,7 @@ pub fn main() void {
       Asserts that <code>@sizeOf(@typeOf(value)) == @sizeOf(DestType)</code>.
       </p>
       <p>
-      Asserts that <code>@typeId(DestType) != @import("builtin").TypeId.Pointer</code>. Use <code>@ptrCast</code> or <code>@intToPtr</code> if you need this.
+      Asserts that <code>@typeInfo(DestType) != @import("builtin").TypeId.Pointer</code>. Use <code>@ptrCast</code> or <code>@intToPtr</code> if you need this.
       </p>
       <p>
       Can be used for these things for example:
@@ -4204,7 +4204,7 @@ test "main" {
       <p>
       Floored division. Rounds toward negative infinity. For unsigned integers it is
       the same as <code>numerator / denominator</code>. Caller guarantees <code>denominator != 0</code> and
-      <code>!(@typeId(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1)</code>.
+      <code>!(@typeInfo(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1)</code>.
       </p>
       <ul>
         <li><code>@divFloor(-5, 3) == -2</code></li>
@@ -4218,7 +4218,7 @@ test "main" {
       <p>
       Truncated division. Rounds toward zero. For unsigned integers it is
       the same as <code>numerator / denominator</code>. Caller guarantees <code>denominator != 0</code> and
-      <code>!(@typeId(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1)</code>.
+      <code>!(@typeInfo(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1)</code>.
       </p>
       <ul>
         <li><code>@divTrunc(-5, 3) == -1</code></li>
@@ -4757,40 +4757,6 @@ const b: u8 = @truncate(u8, a);
       of endianness on the target platform.
       </p>
 
-      {#header_close#}
-      {#header_open|@typeId#}
-      <pre><code class="zig">@typeId(comptime T: type) -&gt; @import("builtin").TypeId</code></pre>
-      <p>
-      Returns which kind of type something is. Possible values:
-      </p>
-      {#code_begin|syntax#}
-pub const TypeId = enum {
-    Type,
-    Void,
-    Bool,
-    NoReturn,
-    Int,
-    Float,
-    Pointer,
-    Array,
-    Struct,
-    FloatLiteral,
-    IntLiteral,
-    UndefinedLiteral,
-    NullLiteral,
-    Nullable,
-    ErrorUnion,
-    Error,
-    Enum,
-    Union,
-    Fn,
-    Namespace,
-    Block,
-    BoundFn,
-    ArgTuple,
-    Opaque,
-};
-      {#code_end#}
       {#header_close#}
       {#header_open|@typeInfo#}
       <pre><code class="zig">@typeInfo(comptime T: type) -&gt; @import("builtin").TypeInfo</code></pre>

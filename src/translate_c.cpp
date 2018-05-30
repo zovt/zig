@@ -4378,9 +4378,9 @@ static AstNode *parse_ctok_primary_expr(Context *c, CTokenize *ctok, size_t *tok
                 *tok_i += 1;
 
 
-                //if (@typeId(@typeOf(x)) == @import("builtin").TypeId.Pointer)
+                //if (@typeInfo(@typeOf(x)) == @import("builtin").TypeId.Pointer)
                 //    @ptrCast(dest, x)
-                //else if (@typeId(@typeOf(x)) == @import("builtin").TypeId.Integer)
+                //else if (@typeInfo(@typeOf(x)) == @import("builtin").TypeId.Integer)
                 //    @intToPtr(dest, x)
                 //else
                 //    (dest)(x)
@@ -4392,7 +4392,7 @@ static AstNode *parse_ctok_primary_expr(Context *c, CTokenize *ctok, size_t *tok
                 AstNode *typeid_integer = trans_create_node_field_access_str(c, typeid_type, "Int");
                 AstNode *typeof_x = trans_create_node_builtin_fn_call_str(c, "typeOf");
                 typeof_x->data.fn_call_expr.params.append(node_to_cast);
-                AstNode *typeid_value = trans_create_node_builtin_fn_call_str(c, "typeId");
+                AstNode *typeid_value = trans_create_node_builtin_fn_call_str(c, "typeInfo");
                 typeid_value->data.fn_call_expr.params.append(typeof_x);
 
                 AstNode *outer_if_cond = trans_create_node_bin_op(c, typeid_value, BinOpTypeCmpEq, typeid_pointer);

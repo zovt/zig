@@ -14,7 +14,7 @@ pub const Error = error{
 };
 
 pub fn render(allocator: &mem.Allocator, stream: var, tree: &ast.Tree) (@typeOf(stream).Child.Error || Error)!void {
-    comptime assert(@typeId(@typeOf(stream)) == builtin.TypeId.Pointer);
+    comptime assert(@typeInfo(@typeOf(stream)) == builtin.TypeId.Pointer);
 
     // render all the line comments at the beginning of the file
     var tok_it = tree.tokens.iterator(0);

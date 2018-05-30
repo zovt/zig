@@ -489,7 +489,7 @@ pub const Builder = struct {
     }
 
     fn typeToEnum(comptime T: type) TypeId {
-        return switch (@typeId(T)) {
+        return switch (@typeInfo(T)) {
             builtin.TypeId.Int => TypeId.Int,
             builtin.TypeId.Float => TypeId.Float,
             builtin.TypeId.Bool => TypeId.Bool,

@@ -82,7 +82,7 @@ extern fn main(c_argc: i32, c_argv: &&u8, c_envp: &?&u8) i32 {
 }
 
 fn callMain() u8 {
-    switch (@typeId(@typeOf(root.main).ReturnType)) {
+    switch (@typeInfo(@typeOf(root.main).ReturnType)) {
         builtin.TypeId.NoReturn => {
             root.main();
         },

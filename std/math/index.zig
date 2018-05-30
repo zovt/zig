@@ -36,7 +36,7 @@ pub const snan = @import("nan.zig").snan;
 pub const inf = @import("inf.zig").inf;
 
 pub fn approxEq(comptime T: type, x: T, y: T, epsilon: T) bool {
-    assert(@typeId(T) == TypeId.Float);
+    assert(@typeInfo(T) == TypeId.Float);
     return fabs(x - y) < epsilon;
 }
 
@@ -323,7 +323,7 @@ fn testOverflow() void {
 
 pub fn absInt(x: var) !@typeOf(x) {
     const T = @typeOf(x);
-    comptime assert(@typeId(T) == builtin.TypeId.Int); // must pass an integer to absInt
+    comptime assert(@typeInfo(T) == builtin.TypeId.Int); // must pass an integer to absInt
     comptime assert(T.is_signed); // must pass a signed integer to absInt
 
     if (x == @minValue(@typeOf(x))) {
@@ -348,7 +348,7 @@ pub const absFloat = @import("fabs.zig").fabs;
 pub fn divTrunc(comptime T: type, numerator: T, denominator: T) !T {
     @setRuntimeSafety(false);
     if (denominator == 0) return error.DivisionByZero;
-    if (@typeId(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1) return error.Overflow;
+    if (@typeInfo(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1) return error.Overflow;
     return @divTrunc(numerator, denominator);
 }
 
@@ -369,7 +369,7 @@ fn testDivTrunc() void {
 pub fn divFloor(comptime T: type, numerator: T, denominator: T) !T {
     @setRuntimeSafety(false);
     if (denominator == 0) return error.DivisionByZero;
-    if (@typeId(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1) return error.Overflow;
+    if (@typeInfo(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1) return error.Overflow;
     return @divFloor(numerator, denominator);
 }
 
@@ -390,7 +390,7 @@ fn testDivFloor() void {
 pub fn divExact(comptime T: type, numerator: T, denominator: T) !T {
     @setRuntimeSafety(false);
     if (denominator == 0) return error.DivisionByZero;
-    if (@typeId(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1) return error.Overflow;
+    if (@typeInfo(T) == builtin.TypeId.Int and T.is_signed and numerator == @minValue(T) and denominator == -1) return error.Overflow;
     const result = @divTrunc(numerator, denominator);
     if (result * denominator != numerator) return error.UnexpectedRemainder;
     return result;
@@ -504,8 +504,8 @@ test "math.negateCast" {
 /// Cast an integer to a different integer type. If the value doesn't fit,
 /// return an error.
 pub fn cast(comptime T: type, x: var) (error{Overflow}!T) {
-    comptime assert(@typeId(T) == builtin.TypeId.Int); // must pass an integer
-    comptime assert(@typeId(@typeOf(x)) == builtin.TypeId.Int); // must pass an integer
+    comptime assert(@typeInfo(T) == builtin.TypeId.Int); // must pass an integer
+    comptime assert(@typeInfo(@typeOf(x)) == builtin.TypeId.Int); // must pass an integer
     if (@maxValue(@typeOf(x)) > @maxValue(T) and x > @maxValue(T)) {
         return error.Overflow;
     } else if (@minValue(@typeOf(x)) < @minValue(T) and x < @minValue(T)) {

@@ -270,7 +270,7 @@ pub fn format(context: var, comptime Errors: type, output: fn(@typeOf(context), 
 
 pub fn formatValue(value: var, context: var, comptime Errors: type, output: fn(@typeOf(context), []const u8) Errors!void) Errors!void {
     const T = @typeOf(value);
-    switch (@typeId(T)) {
+    switch (@typeInfo(T)) {
         builtin.TypeId.Int => {
             return formatInt(value, 10, false, 0, context, Errors, output);
         },
@@ -302,7 +302,7 @@ pub fn formatValue(value: var, context: var, comptime Errors: type, output: fn(@
             return output(context, @errorName(value));
         },
         builtin.TypeId.Pointer => {
-            if (@typeId(T.Child) == builtin.TypeId.Array and T.Child.Child == u8) {
+            if (@typeInfo(T.Child) == builtin.TypeId.Array and T.Child.Child == u8) {
                 return output(context, (value.*)[0..]);
             } else {
                 return format(context, Errors, output, "{}@{x}", @typeName(T.Child), @ptrToInt(value));

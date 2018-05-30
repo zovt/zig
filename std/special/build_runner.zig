@@ -130,7 +130,7 @@ pub fn main() !void {
 }
 
 fn runBuild(builder: &Builder) error!void {
-    switch (@typeId(@typeOf(root.build).ReturnType)) {
+    switch (@typeInfo(@typeOf(root.build).ReturnType)) {
         builtin.TypeId.Void => root.build(builder),
         builtin.TypeId.ErrorUnion => try root.build(builder),
         else => @compileError("expected return type of build to be 'void' or '!void'"),
