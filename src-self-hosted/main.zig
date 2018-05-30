@@ -38,7 +38,7 @@ const usage =
     \\  zen                          Print zen of zig and exit
     \\
     \\
-    ;
+;
 
 const Command = struct {
     name: []const u8,
@@ -64,22 +64,61 @@ pub fn main() !void {
         os.exit(1);
     }
 
-    const commands = []Command {
-        Command { .name = "build",       .exec = cmdBuild      },
-        Command { .name = "build-exe",   .exec = cmdBuildExe   },
-        Command { .name = "build-lib",   .exec = cmdBuildLib   },
-        Command { .name = "build-obj",   .exec = cmdBuildObj   },
-        Command { .name = "fmt",         .exec = cmdFmt        },
-        Command { .name = "run",         .exec = cmdRun        },
-        Command { .name = "targets",     .exec = cmdTargets    },
-        Command { .name = "test",        .exec = cmdTest       },
-        Command { .name = "translate-c", .exec = cmdTranslateC },
-        Command { .name = "version",     .exec = cmdVersion    },
-        Command { .name = "zen",         .exec = cmdZen        },
+    const commands = []Command{
+        Command{
+            .name = "build",
+            .exec = cmdBuild,
+        },
+        Command{
+            .name = "build-exe",
+            .exec = cmdBuildExe,
+        },
+        Command{
+            .name = "build-lib",
+            .exec = cmdBuildLib,
+        },
+        Command{
+            .name = "build-obj",
+            .exec = cmdBuildObj,
+        },
+        Command{
+            .name = "fmt",
+            .exec = cmdFmt,
+        },
+        Command{
+            .name = "run",
+            .exec = cmdRun,
+        },
+        Command{
+            .name = "targets",
+            .exec = cmdTargets,
+        },
+        Command{
+            .name = "test",
+            .exec = cmdTest,
+        },
+        Command{
+            .name = "translate-c",
+            .exec = cmdTranslateC,
+        },
+        Command{
+            .name = "version",
+            .exec = cmdVersion,
+        },
+        Command{
+            .name = "zen",
+            .exec = cmdZen,
+        },
 
         // undocumented commands
-        Command { .name = "help",        .exec = cmdHelp       },
-        Command { .name = "internal",    .exec = cmdInternal   },
+        Command{
+            .name = "help",
+            .exec = cmdHelp,
+        },
+        Command{
+            .name = "internal",
+            .exec = cmdInternal,
+        },
     };
 
     for (commands) |command| {
@@ -121,9 +160,9 @@ const usage_build =
     \\   --verbose-cimport            Enable compiler debug output for C imports
     \\
     \\
-    ;
+;
 
-const args_build_spec = []Flag {
+const args_build_spec = []Flag{
     Flag.Bool("--help"),
     Flag.Bool("--init"),
     Flag.Arg1("--build-file"),
@@ -149,7 +188,7 @@ const missing_build_file =
     \\
     \\See: `zig build --help` or `zig help` for more options.
     \\
-    ;
+;
 
 fn cmdBuild(allocator: &Allocator, args: []const []const u8) !void {
     var flags = try Args.parse(allocator, args_build_spec, args);
@@ -318,15 +357,23 @@ const usage_build_generic =
     \\  --ver-patch [ver]            Dynamic library semver patch version
     \\
     \\
-    ;
+;
 
-const args_build_generic = []Flag {
+const args_build_generic = []Flag{
     Flag.Bool("--help"),
-    Flag.Option("--color", []const []const u8 { "auto", "off", "on" }),
+    Flag.Option("--color", []const []const u8{
+        "auto",
+        "off",
+        "on",
+    }),
 
     Flag.ArgMergeN("--assembly", 1),
     Flag.Arg1("--cache-dir"),
-    Flag.Option("--emit", []const []const u8 { "asm", "bin", "llvm-ir" }),
+    Flag.Option("--emit", []const []const u8{
+        "asm",
+        "bin",
+        "llvm-ir",
+    }),
     Flag.Bool("--enable-timing-info"),
     Flag.Arg1("--libc-include-dir"),
     Flag.Arg1("--name"),
@@ -472,7 +519,7 @@ fn buildOutputType(allocator: &Allocator, args: []const []const u8, out_type: Mo
         os.exit(1);
     };
 
-    const asm_a= flags.many("assembly");
+    const asm_a = flags.many("assembly");
     const obj_a = flags.many("object");
     if (in_file == null and (obj_a == null or (??obj_a).len == 0) and (asm_a == null or (??asm_a).len == 0)) {
         try stderr.write("Expected source file argument or at least one --object or --assembly argument\n");
@@ -494,17 +541,16 @@ fn buildOutputType(allocator: &Allocator, args: []const []const u8, out_type: Mo
     const zig_lib_dir = introspect.resolveZigLibDir(allocator) catch os.exit(1);
     defer allocator.free(zig_lib_dir);
 
-    var module =
-        try Module.create(
-            allocator,
-            root_name,
-            zig_root_source_file,
-            Target.Native,
-            out_type,
-            build_mode,
-            zig_lib_dir,
-            full_cache_dir
-        );
+    var module = try Module.create(
+        allocator,
+        root_name,
+        zig_root_source_file,
+        Target.Native,
+        out_type,
+        build_mode,
+        zig_lib_dir,
+        full_cache_dir,
+    );
     defer module.destroy();
 
     module.version_major = try std.fmt.parseUnsigned(u32, flags.single("ver-major") ?? "0", 10);
@@ -589,10 +635,10 @@ fn buildOutputType(allocator: &Allocator, args: []const []const u8, out_type: Mo
     }
 
     if (flags.single("mmacosx-version-min")) |ver| {
-        module.darwin_version_min = Module.DarwinVersionMin { .MacOS = ver };
+        module.darwin_version_min = Module.DarwinVersionMin{ .MacOS = ver };
     }
     if (flags.single("mios-version-min")) |ver| {
-        module.darwin_version_min = Module.DarwinVersionMin { .Ios = ver };
+        module.darwin_version_min = Module.DarwinVersionMin{ .Ios = ver };
     }
 
     module.emit_file_type = emit_type;
@@ -640,11 +686,9 @@ const usage_fmt =
     \\   --help                 Print this help and exit
     \\
     \\
-    ;
+;
 
-const args_fmt_spec = []Flag {
-    Flag.Bool("--help"),
-};
+const args_fmt_spec = []Flag{Flag.Bool("--help")};
 
 fn cmdFmt(allocator: &Allocator, args: []const []const u8) !void {
     var flags = try Args.parse(allocator, args_fmt_spec, args);
@@ -675,7 +719,6 @@ fn cmdFmt(allocator: &Allocator, args: []const []const u8) !void {
             continue;
         };
         defer tree.deinit();
-
 
         var error_it = tree.errors.iterator(0);
         while (error_it.next()) |parse_error| {
@@ -727,8 +770,7 @@ fn cmdTargets(allocator: &Allocator, args: []const []const u8) !void {
             };
 
             // NOTE: Cannot use empty string, see #918.
-            comptime const native_str =
-                if (comptime mem.eql(u8, arch.name, tag_name)) " (native)\n" else "\n";
+            comptime const native_str = if (comptime mem.eql(u8, arch.name, tag_name)) " (native)\n" else "\n";
 
             try stdout.print("  {}{}", arch.name, native_str);
         }
@@ -740,9 +782,7 @@ fn cmdTargets(allocator: &Allocator, args: []const []const u8) !void {
         const systems = comptime meta.fields(builtin.Os);
         inline for (systems) |system| {
             // NOTE: Cannot use empty string, see #918.
-            comptime const native_str =
-                if (comptime mem.eql(u8, system.name, meta.tagName(builtin.os))) " (native)\n" else "\n";
-
+            comptime const native_str = if (comptime mem.eql(u8, system.name, meta.tagName(builtin.os))) " (native)\n" else "\n";
             try stdout.print("  {}{}", system.name, native_str);
         }
     }
@@ -753,9 +793,7 @@ fn cmdTargets(allocator: &Allocator, args: []const []const u8) !void {
         const envs = comptime meta.fields(builtin.Environ);
         inline for (envs) |env| {
             // NOTE: Cannot use empty string, see #918.
-            comptime const native_str =
-                if (comptime mem.eql(u8, env.name, meta.tagName(builtin.environ))) " (native)\n" else "\n";
-
+            comptime const native_str = if (comptime mem.eql(u8, env.name, meta.tagName(builtin.environ))) " (native)\n" else "\n";
             try stdout.print("  {}{}", env.name, native_str);
         }
     }
@@ -776,12 +814,9 @@ const usage_test =
     \\   --help                 Print this help and exit
     \\
     \\
-    ;
+;
 
-const args_test_spec = []Flag {
-    Flag.Bool("--help"),
-};
-
+const args_test_spec = []Flag{Flag.Bool("--help")};
 
 fn cmdTest(allocator: &Allocator, args: []const []const u8) !void {
     var flags = try Args.parse(allocator, args_build_spec, args);
@@ -814,21 +849,18 @@ const usage_run =
     \\   --help                 Print this help and exit
     \\
     \\
-    ;
+;
 
-const args_run_spec = []Flag {
-    Flag.Bool("--help"),
-};
-
+const args_run_spec = []Flag{Flag.Bool("--help")};
 
 fn cmdRun(allocator: &Allocator, args: []const []const u8) !void {
     var compile_args = args;
-    var runtime_args: []const []const u8 = []const []const u8 {};
+    var runtime_args: []const []const u8 = []const []const u8{};
 
     for (args) |argv, i| {
         if (mem.eql(u8, argv, "--")) {
             compile_args = args[0..i];
-            runtime_args = args[i+1..];
+            runtime_args = args[i + 1..];
             break;
         }
     }
@@ -862,9 +894,9 @@ const usage_translate_c =
     \\  --output [path]              Output file to write generated zig file (default: stdout)
     \\
     \\
-    ;
+;
 
-const args_translate_c_spec = []Flag {
+const args_translate_c_spec = []Flag{
     Flag.Bool("--help"),
     Flag.Bool("--enable-timing-info"),
     Flag.Arg1("--libc-include-dir"),
@@ -938,7 +970,7 @@ const info_zen =
     \\ * Together we serve end users.
     \\
     \\
-    ;
+;
 
 fn cmdZen(allocator: &Allocator, args: []const []const u8) !void {
     try stdout.write(info_zen);
@@ -953,7 +985,7 @@ const usage_internal =
     \\  build-info                   Print static compiler build-info
     \\
     \\
-    ;
+;
 
 fn cmdInternal(allocator: &Allocator, args: []const []const u8) !void {
     if (args.len == 0) {
@@ -961,9 +993,10 @@ fn cmdInternal(allocator: &Allocator, args: []const []const u8) !void {
         os.exit(1);
     }
 
-    const sub_commands = []Command {
-        Command { .name = "build-info", .exec = cmdInternalBuildInfo },
-    };
+    const sub_commands = []Command{Command{
+        .name = "build-info",
+        .exec = cmdInternalBuildInfo,
+    }};
 
     for (sub_commands) |sub_command| {
         if (mem.eql(u8, sub_command.name, args[0])) {
@@ -987,7 +1020,7 @@ fn cmdInternalBuildInfo(allocator: &Allocator, args: []const []const u8) !void {
         \\ZIG_C_HEADER_FILES   {}
         \\ZIG_DIA_GUIDS_LIB    {}
         \\
-        ,
+    ,
         std.cstr.toSliceConst(c.ZIG_CMAKE_BINARY_DIR),
         std.cstr.toSliceConst(c.ZIG_CXX_COMPILER),
         std.cstr.toSliceConst(c.ZIG_LLVM_CONFIG_EXE),

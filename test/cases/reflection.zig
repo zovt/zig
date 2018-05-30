@@ -26,7 +26,7 @@ fn dummy(a: bool, b: i32, c: f32) i32 {
 fn dummy_varargs(args: ...) void {}
 
 test "reflection: @field" {
-    var f = Foo {
+    var f = Foo{
         .one = 42,
         .two = true,
         .three = void{},
