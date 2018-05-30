@@ -9,7 +9,7 @@ test "type info: tag type, void info" {
 }
 
 fn testBasic() void {
-    assert(@TagType(TypeInfo) == TypeId);
+    assert(@typeInfo(TypeInfo).Union.tag_type == TypeId);
     const void_info = @typeInfo(void);
     assert(TypeId(void_info) == TypeId.Void);
     assert(void_info.Void == {});

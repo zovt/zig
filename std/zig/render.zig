@@ -1,6 +1,7 @@
 const std = @import("../index.zig");
 const builtin = @import("builtin");
 const assert = std.debug.assert;
+const meta = std.meta;
 const mem = std.mem;
 const ast = std.zig.ast;
 const Token = std.zig.Token;
@@ -395,7 +396,7 @@ fn renderExpression(
             const suffix_op = @fieldParentPtr(ast.Node.SuffixOp, "base", base);
 
             switch (suffix_op.op) {
-                @TagType(ast.Node.SuffixOp.Op).Call => |*call_info| {
+                meta.TagType(ast.Node.SuffixOp.Op).Call => |*call_info| {
                     if (call_info.async_attr) |async_attr| {
                         try renderExpression(allocator, stream, tree, indent, start_col, &async_attr.base, Space.Space);
                     }
@@ -472,7 +473,7 @@ fn renderExpression(
                     return renderToken(tree, stream, suffix_op.rtoken, indent, start_col, space); // *
                 },
 
-                @TagType(ast.Node.SuffixOp.Op).Slice => |range| {
+                meta.TagType(ast.Node.SuffixOp.Op).Slice => |range| {
                     try renderExpression(allocator, stream, tree, indent, start_col, suffix_op.lhs, Space.None);
 
                     const lbracket = tree.prevToken(range.start.firstToken());

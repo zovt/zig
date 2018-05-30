@@ -589,10 +589,6 @@ static constexpr IrInstructionId ir_instruction_id(IrInstructionPanic *) {
     return IrInstructionIdPanic;
 }
 
-static constexpr IrInstructionId ir_instruction_id(IrInstructionTagType *) {
-    return IrInstructionIdTagType;
-}
-
 static constexpr IrInstructionId ir_instruction_id(IrInstructionFieldParentPtr *) {
     return IrInstructionIdFieldParentPtr;
 }
@@ -2340,17 +2336,6 @@ static IrInstruction *ir_build_panic(IrBuilder *irb, Scope *scope, AstNode *sour
     return &instruction->base;
 }
 
-static IrInstruction *ir_build_tag_type(IrBuilder *irb, Scope *scope, AstNode *source_node,
-        IrInstruction *target)
-{
-    IrInstructionTagType *instruction = ir_build_instruction<IrInstructionTagType>(irb, scope, source_node);
-    instruction->target = target;
-
-    ir_ref_instruction(target, irb->current_basic_block);
-
-    return &instruction->base;
-}
-
 static IrInstruction *ir_build_field_parent_ptr(IrBuilder *irb, Scope *scope, AstNode *source_node,
         IrInstruction *type_value, IrInstruction *field_name, IrInstruction *field_ptr, TypeStructField *field)
 {
@@ -4089,16 +4074,6 @@ static IrInstruction *ir_gen_builtin_fn_call(IrBuilder *irb, Scope *scope, AstNo
 
                 IrInstruction *ptr_to_int = ir_build_ptr_to_int(irb, scope, node, arg0_value);
                 return ir_lval_wrap(irb, scope, ptr_to_int, lval);
-            }
-        case BuiltinFnIdTagType:
-            {
-                AstNode *arg0_node = node->data.fn_call_expr.params.at(0);
-                IrInstruction *arg0_value = ir_gen_node(irb, arg0_node, scope);
-                if (arg0_value == irb->codegen->invalid_instruction)
-                    return arg0_value;
-
-                IrInstruction *tag_type = ir_build_tag_type(irb, scope, node, arg0_value);
-                return ir_lval_wrap(irb, scope, tag_type, lval);
             }
         case BuiltinFnIdFieldParentPtr:
             {
@@ -18487,45 +18462,6 @@ static TypeTableEntry *ir_analyze_instruction_set_align_stack(IrAnalyze *ira, Ir
     return ira->codegen->builtin_types.entry_void;
 }
 
-static TypeTableEntry *ir_analyze_instruction_tag_type(IrAnalyze *ira, IrInstructionTagType *instruction) {
-    IrInstruction *target_inst = instruction->target->other;
-    TypeTableEntry *enum_type = ir_resolve_type(ira, target_inst);
-    if (type_is_invalid(enum_type))
-        return ira->codegen->builtin_types.entry_invalid;
-
-    if (enum_type->id == TypeTableEntryIdEnum) {
-        ensure_complete_type(ira->codegen, enum_type);
-        if (type_is_invalid(enum_type))
-            return ira->codegen->builtin_types.entry_invalid;
-
-        ConstExprValue *out_val = ir_build_const_from(ira, &instruction->base);
-        out_val->data.x_type = enum_type->data.enumeration.tag_int_type;
-        return ira->codegen->builtin_types.entry_type;
-    } else if (enum_type->id == TypeTableEntryIdUnion) {
-        ensure_complete_type(ira->codegen, enum_type);
-        if (type_is_invalid(enum_type))
-            return ira->codegen->builtin_types.entry_invalid;
-
-        AstNode *decl_node = enum_type->data.unionation.decl_node;
-        if (decl_node->data.container_decl.auto_enum || decl_node->data.container_decl.init_arg_expr != nullptr) {
-            assert(enum_type->data.unionation.tag_type != nullptr);
-
-            ConstExprValue *out_val = ir_build_const_from(ira, &instruction->base);
-            out_val->data.x_type = enum_type->data.unionation.tag_type;
-            return ira->codegen->builtin_types.entry_type;
-        } else {
-            ErrorMsg *msg = ir_add_error(ira, target_inst, buf_sprintf("union '%s' has no tag",
-                buf_ptr(&enum_type->name)));
-            add_error_note(ira->codegen, msg, decl_node, buf_sprintf("consider 'union(enum)' here"));
-            return ira->codegen->builtin_types.entry_invalid;
-        }
-    } else {
-        ir_add_error(ira, target_inst, buf_sprintf("expected enum or union, found '%s'",
-            buf_ptr(&enum_type->name)));
-        return ira->codegen->builtin_types.entry_invalid;
-    }
-}
-
 static TypeTableEntry *ir_analyze_instruction_cancel(IrAnalyze *ira, IrInstructionCancel *instruction) {
     IrInstruction *target_inst = instruction->target->other;
     if (type_is_invalid(target_inst->value.type))
@@ -19187,8 +19123,6 @@ static TypeTableEntry *ir_analyze_instruction_nocast(IrAnalyze *ira, IrInstructi
             return ir_analyze_instruction_opaque_type(ira, (IrInstructionOpaqueType *)instruction);
         case IrInstructionIdSetAlignStack:
             return ir_analyze_instruction_set_align_stack(ira, (IrInstructionSetAlignStack *)instruction);
-        case IrInstructionIdTagType:
-            return ir_analyze_instruction_tag_type(ira, (IrInstructionTagType *)instruction);
         case IrInstructionIdExport:
             return ir_analyze_instruction_export(ira, (IrInstructionExport *)instruction);
         case IrInstructionIdErrorReturnTrace:
@@ -19438,7 +19372,6 @@ bool ir_has_side_effects(IrInstruction *instruction) {
         case IrInstructionIdTypeId:
         case IrInstructionIdAlignCast:
         case IrInstructionIdOpaqueType:
-        case IrInstructionIdTagType:
         case IrInstructionIdErrorReturnTrace:
         case IrInstructionIdErrorUnion:
         case IrInstructionIdGetImplicitAllocator:

@@ -971,12 +971,6 @@ static void ir_print_set_align_stack(IrPrint *irp, IrInstructionSetAlignStack *i
     fprintf(irp->f, ")");
 }
 
-static void ir_print_enum_tag_type(IrPrint *irp, IrInstructionTagType *instruction) {
-    fprintf(irp->f, "@TagType(");
-    ir_print_other_instruction(irp, instruction->target);
-    fprintf(irp->f, ")");
-}
-
 static void ir_print_export(IrPrint *irp, IrInstructionExport *instruction) {
     if (instruction->linkage == nullptr) {
         fprintf(irp->f, "@export(");
@@ -1501,9 +1495,6 @@ static void ir_print_instruction(IrPrint *irp, IrInstruction *instruction) {
             break;
         case IrInstructionIdSetAlignStack:
             ir_print_set_align_stack(irp, (IrInstructionSetAlignStack *)instruction);
-            break;
-        case IrInstructionIdTagType:
-            ir_print_enum_tag_type(irp, (IrInstructionTagType *)instruction);
             break;
         case IrInstructionIdExport:
             ir_print_export(irp, (IrInstructionExport *)instruction);

@@ -1336,7 +1336,6 @@ enum BuiltinFnId {
     BuiltinFnIdBitCast,
     BuiltinFnIdIntToPtr,
     BuiltinFnIdPtrToInt,
-    BuiltinFnIdTagType,
     BuiltinFnIdFieldParentPtr,
     BuiltinFnIdInlineCall,
     BuiltinFnIdNoInlineCall,
@@ -2037,7 +2036,6 @@ enum IrInstructionId {
     IrInstructionIdCanImplicitCast,
     IrInstructionIdDeclRef,
     IrInstructionIdPanic,
-    IrInstructionIdTagType,
     IrInstructionIdFieldParentPtr,
     IrInstructionIdTypeInfo,
     IrInstructionIdTypeId,
@@ -2811,12 +2809,6 @@ struct IrInstructionPanic {
     IrInstruction base;
 
     IrInstruction *msg;
-};
-
-struct IrInstructionTagType {
-    IrInstruction base;
-
-    IrInstruction *target;
 };
 
 struct IrInstructionFieldParentPtr {

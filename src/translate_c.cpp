@@ -2259,14 +2259,16 @@ static int trans_local_declaration(Context *c, TransScope *scope, const DeclStmt
 }
 
 static AstNode *to_enum_zero_cmp(Context *c, AstNode *expr, AstNode *enum_type) {
-    AstNode *tag_type = trans_create_node_builtin_fn_call_str(c, "TagType");
-    tag_type->data.fn_call_expr.params.append(enum_type);
+    AstNode *type_info = trans_create_node_builtin_fn_call_str(c, "typeInfo");
+    type_info->data.fn_call_expr.params.append(enum_type);
+    AstNode *enum_field = trans_create_node_field_access_str(c, type_info, "Enum");
+    AstNode *tag_type = trans_create_node_field_access_str(c, enum_field, "tag_type");
 
-    // @TagType(Enum)(0)
+    // @typeInfo(Enum).Enum.tag_type(0)
     AstNode *zero = trans_create_node_unsigned_negative(c, 0, false);
     AstNode *casted_zero = trans_create_node_fn_call_1(c, tag_type, zero);
 
-    // @bitCast(Enum, @TagType(Enum)(0))
+    // @bitCast(Enum, @typeInfo(Enum).Enum.tag_type(0))
     AstNode *bitcast = trans_create_node_builtin_fn_call_str(c, "bitCast");
     bitcast->data.fn_call_expr.params.append(enum_type);
     bitcast->data.fn_call_expr.params.append(casted_zero);

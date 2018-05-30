@@ -1235,7 +1235,7 @@ pub fn addCases(cases: &tests.TranslateCContext) void {
         \\    if (a != 0) return 0;
         \\    if (b != 0) return 1;
         \\    if (c != null) return 2;
-        \\    if (d != @bitCast(enum_SomeEnum, @TagType(enum_SomeEnum)(0))) return 3;
+        \\    if (d != @bitCast(enum_SomeEnum, @typeInfo(enum_SomeEnum).Enum.tag_type(0))) return 3;
         \\    return 4;
         \\}
     );
