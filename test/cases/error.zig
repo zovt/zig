@@ -82,8 +82,8 @@ test "error union type " {
 fn testErrorUnionType() void {
     const x: error!i32 = 1234;
     if (x) |value| assert(value == 1234) else |_| unreachable;
-    assert(@typeId(@typeOf(x)) == builtin.TypeId.ErrorUnion);
-    assert(@typeId(@typeOf(x).ErrorSet) == builtin.TypeId.ErrorSet);
+    assert(@typeInfo(@typeOf(x)) == builtin.TypeId.ErrorUnion);
+    assert(@typeInfo(@typeOf(x).ErrorSet) == builtin.TypeId.ErrorSet);
     assert(@typeOf(x).ErrorSet == error);
 }
 

@@ -592,10 +592,6 @@ static constexpr IrInstructionId ir_instruction_id(IrInstructionTypeInfo *) {
     return IrInstructionIdTypeInfo;
 }
 
-static constexpr IrInstructionId ir_instruction_id(IrInstructionTypeId *) {
-    return IrInstructionIdTypeId;
-}
-
 static constexpr IrInstructionId ir_instruction_id(IrInstructionSetEvalBranchQuota *) {
     return IrInstructionIdSetEvalBranchQuota;
 }
@@ -2352,17 +2348,6 @@ static IrInstruction *ir_build_type_info(IrBuilder *irb, Scope *scope, AstNode *
     ir_ref_instruction(type_value, irb->current_basic_block);
 
     return &instruction->base;    
-}
-
-static IrInstruction *ir_build_type_id(IrBuilder *irb, Scope *scope, AstNode *source_node,
-        IrInstruction *type_value)
-{
-    IrInstructionTypeId *instruction = ir_build_instruction<IrInstructionTypeId>(irb, scope, source_node);
-    instruction->type_value = type_value;
-
-    ir_ref_instruction(type_value, irb->current_basic_block);
-
-    return &instruction->base;
 }
 
 static IrInstruction *ir_build_set_eval_branch_quota(IrBuilder *irb, Scope *scope, AstNode *source_node,
@@ -4141,16 +4126,6 @@ static IrInstruction *ir_gen_builtin_fn_call(IrBuilder *irb, Scope *scope, AstNo
 
                 IrInstruction *call = ir_build_call(irb, scope, node, nullptr, fn_ref, arg_count, args, false, FnInlineAuto, false, nullptr, new_stack);
                 return ir_lval_wrap(irb, scope, call, lval);
-            }
-        case BuiltinFnIdTypeId:
-            {
-                AstNode *arg0_node = node->data.fn_call_expr.params.at(0);
-                IrInstruction *arg0_value = ir_gen_node(irb, arg0_node, scope);
-                if (arg0_value == irb->codegen->invalid_instruction)
-                    return arg0_value;
-
-                IrInstruction *type_id = ir_build_type_id(irb, scope, node, arg0_value);
-                return ir_lval_wrap(irb, scope, type_id, lval);
             }
         case BuiltinFnIdShlExact:
             {
@@ -16391,23 +16366,6 @@ static TypeTableEntry *ir_analyze_instruction_type_info(IrAnalyze *ira,
     return result_type;
 }
 
-static TypeTableEntry *ir_analyze_instruction_type_id(IrAnalyze *ira,
-        IrInstructionTypeId *instruction)
-{
-    IrInstruction *type_value = instruction->type_value->other;
-    TypeTableEntry *type_entry = ir_resolve_type(ira, type_value);
-    if (type_is_invalid(type_entry))
-        return ira->codegen->builtin_types.entry_invalid;
-
-    ConstExprValue *var_value = get_builtin_value(ira->codegen, "TypeId");
-    assert(var_value->type->id == TypeTableEntryIdMetaType);
-    TypeTableEntry *result_type = var_value->data.x_type;
-
-    ConstExprValue *out_val = ir_build_const_from(ira, &instruction->base);
-    bigint_init_unsigned(&out_val->data.x_enum_tag, type_id_index(type_entry));
-    return result_type;
-}
-
 static TypeTableEntry *ir_analyze_instruction_set_eval_branch_quota(IrAnalyze *ira,
         IrInstructionSetEvalBranchQuota *instruction)
 {
@@ -19095,8 +19053,6 @@ static TypeTableEntry *ir_analyze_instruction_nocast(IrAnalyze *ira, IrInstructi
             return ir_analyze_instruction_field_parent_ptr(ira, (IrInstructionFieldParentPtr *)instruction);
         case IrInstructionIdTypeInfo:
             return ir_analyze_instruction_type_info(ira, (IrInstructionTypeInfo *) instruction);
-        case IrInstructionIdTypeId:
-            return ir_analyze_instruction_type_id(ira, (IrInstructionTypeId *)instruction);
         case IrInstructionIdSetEvalBranchQuota:
             return ir_analyze_instruction_set_eval_branch_quota(ira, (IrInstructionSetEvalBranchQuota *)instruction);
         case IrInstructionIdPtrType:
@@ -19353,7 +19309,6 @@ bool ir_has_side_effects(IrInstruction *instruction) {
         case IrInstructionIdTypeName:
         case IrInstructionIdFieldParentPtr:
         case IrInstructionIdTypeInfo:
-        case IrInstructionIdTypeId:
         case IrInstructionIdAlignCast:
         case IrInstructionIdOpaqueType:
         case IrInstructionIdErrorReturnTrace:

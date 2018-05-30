@@ -14,8 +14,8 @@ pub const Error = error{
 };
 
 /// Returns whether anything changed
-pub fn render(allocator: *mem.Allocator, stream: var, tree: *ast.Tree) (@typeOf(stream).Child.Error || Error)!bool {
-    comptime assert(@typeId(@typeOf(stream)) == builtin.TypeId.Pointer);
+pub fn render(allocator: &mem.Allocator, stream: var, tree: *ast.Tree) (@typeOf(stream).Child.Error || Error)!bool {
+    comptime assert(@typeInfo(@typeOf(stream)) == builtin.TypeId.Pointer);
 
     var anything_changed: bool = false;
 

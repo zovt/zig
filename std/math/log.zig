@@ -9,11 +9,11 @@ pub fn log(comptime T: type, base: T, x: T) T {
         return math.log2(x);
     } else if (base == 10) {
         return math.log10(x);
-    } else if ((@typeId(T) == TypeId.Float or @typeId(T) == TypeId.FloatLiteral) and base == math.e) {
+    } else if ((@typeInfo(T) == TypeId.Float or @typeInfo(T) == TypeId.FloatLiteral) and base == math.e) {
         return math.ln(x);
     }
 
-    switch (@typeId(T)) {
+    switch (@typeInfo(T)) {
         TypeId.FloatLiteral => {
             return @typeOf(1.0)(math.ln(f64(x)) / math.ln(f64(base)));
         },

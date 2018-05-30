@@ -11,9 +11,9 @@ const assert = std.debug.assert;
 const builtin = @import("builtin");
 const TypeId = builtin.TypeId;
 
-pub fn sqrt(x: var) (if (@typeId(@typeOf(x)) == TypeId.Int) @IntType(false, @typeOf(x).bit_count / 2) else @typeOf(x)) {
+pub fn sqrt(x: var) (if (@typeInfo(@typeOf(x)) == TypeId.Int) @IntType(false, @typeOf(x).bit_count / 2) else @typeOf(x)) {
     const T = @typeOf(x);
-    switch (@typeId(T)) {
+    switch (@typeInfo(T)) {
         TypeId.FloatLiteral => return T(@sqrt(f64, x)), // TODO upgrade to f128
         TypeId.Float => return @sqrt(T, x),
         TypeId.IntLiteral => comptime {

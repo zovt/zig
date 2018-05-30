@@ -13,7 +13,7 @@ const TypeId = builtin.TypeId;
 
 pub fn ln(x: var) @typeOf(x) {
     const T = @typeOf(x);
-    switch (@typeId(T)) {
+    switch (@typeInfo(T)) {
         TypeId.FloatLiteral => {
             return @typeOf(1.0)(ln_64(x));
         },

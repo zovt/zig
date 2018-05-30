@@ -485,35 +485,35 @@ const AUnion = union {
     Two: void,
 };
 
-test "@typeId" {
+test "@typeInfo" {
     comptime {
-        assert(@typeId(type) == Tid.Type);
-        assert(@typeId(void) == Tid.Void);
-        assert(@typeId(bool) == Tid.Bool);
-        assert(@typeId(noreturn) == Tid.NoReturn);
-        assert(@typeId(i8) == Tid.Int);
-        assert(@typeId(u8) == Tid.Int);
-        assert(@typeId(i64) == Tid.Int);
-        assert(@typeId(u64) == Tid.Int);
-        assert(@typeId(f32) == Tid.Float);
-        assert(@typeId(f64) == Tid.Float);
-        assert(@typeId(*f32) == Tid.Pointer);
-        assert(@typeId([2]u8) == Tid.Array);
-        assert(@typeId(AStruct) == Tid.Struct);
-        assert(@typeId(@typeOf(1)) == Tid.IntLiteral);
-        assert(@typeId(@typeOf(1.0)) == Tid.FloatLiteral);
-        assert(@typeId(@typeOf(undefined)) == Tid.UndefinedLiteral);
-        assert(@typeId(@typeOf(null)) == Tid.NullLiteral);
-        assert(@typeId(?i32) == Tid.Nullable);
-        assert(@typeId(error!i32) == Tid.ErrorUnion);
-        assert(@typeId(error) == Tid.ErrorSet);
-        assert(@typeId(AnEnum) == Tid.Enum);
-        assert(@typeId(@typeOf(AUnionEnum.One)) == Tid.Enum);
-        assert(@typeId(AUnionEnum) == Tid.Union);
-        assert(@typeId(AUnion) == Tid.Union);
-        assert(@typeId(fn () void) == Tid.Fn);
-        assert(@typeId(@typeOf(builtin)) == Tid.Namespace);
-        assert(@typeId(@typeOf(x: {
+        assert(@typeInfo(type) == Tid.Type);
+        assert(@typeInfo(void) == Tid.Void);
+        assert(@typeInfo(bool) == Tid.Bool);
+        assert(@typeInfo(noreturn) == Tid.NoReturn);
+        assert(@typeInfo(i8) == Tid.Int);
+        assert(@typeInfo(u8) == Tid.Int);
+        assert(@typeInfo(i64) == Tid.Int);
+        assert(@typeInfo(u64) == Tid.Int);
+        assert(@typeInfo(f32) == Tid.Float);
+        assert(@typeInfo(f64) == Tid.Float);
+        assert(@typeInfo(*f32) == Tid.Pointer);
+        assert(@typeInfo([2]u8) == Tid.Array);
+        assert(@typeInfo(AStruct) == Tid.Struct);
+        assert(@typeInfo(@typeOf(1)) == Tid.IntLiteral);
+        assert(@typeInfo(@typeOf(1.0)) == Tid.FloatLiteral);
+        assert(@typeInfo(@typeOf(undefined)) == Tid.UndefinedLiteral);
+        assert(@typeInfo(@typeOf(null)) == Tid.NullLiteral);
+        assert(@typeInfo(?i32) == Tid.Nullable);
+        assert(@typeInfo(error!i32) == Tid.ErrorUnion);
+        assert(@typeInfo(error) == Tid.ErrorSet);
+        assert(@typeInfo(AnEnum) == Tid.Enum);
+        assert(@typeInfo(@typeOf(AUnionEnum.One)) == Tid.Enum);
+        assert(@typeInfo(AUnionEnum) == Tid.Union);
+        assert(@typeInfo(AUnion) == Tid.Union);
+        assert(@typeInfo(fn() void) == Tid.Fn);
+        assert(@typeInfo(@typeOf(builtin)) == Tid.Namespace);
+        assert(@typeInfo(@typeOf(x: {
             break :x this;
         })) == Tid.Block);
         // TODO bound fn
