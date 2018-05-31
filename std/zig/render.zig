@@ -344,7 +344,7 @@ fn renderExpression(
 
             switch (prefix_op_node.op) {
                 ast.Node.PrefixOp.Op.AddrOf => |addr_of_info| {
-                    try renderToken(tree, stream, prefix_op_node.op_token, indent, start_col, Space.None); // &
+                    try stream.write("*");
                     if (addr_of_info.align_info) |align_info| {
                         const lparen_token = tree.prevToken(align_info.node.firstToken());
                         const align_token = tree.prevToken(lparen_token);
@@ -426,10 +426,11 @@ fn renderExpression(
                 ast.Node.PrefixOp.Op.NegationWrap,
                 ast.Node.PrefixOp.Op.UnwrapMaybe,
                 ast.Node.PrefixOp.Op.MaybeType,
-                ast.Node.PrefixOp.Op.PointerType,
                 => {
                     try renderToken(tree, stream, prefix_op_node.op_token, indent, start_col, Space.None);
                 },
+
+                ast.Node.PrefixOp.Op.PointerType => try stream.write("*"),
 
                 ast.Node.PrefixOp.Op.Try,
                 ast.Node.PrefixOp.Op.Await,
