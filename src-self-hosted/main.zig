@@ -781,8 +781,7 @@ fn cmdTargets(allocator: *Allocator, args: []const []const u8) !void {
             };
 
             // NOTE: Cannot use empty string, see #918.
-            comptime const native_str =
-                if (comptime mem.eql(u8, arch.name, tag_name)) " (native)\n" else "\n";
+            comptime const native_str = if (comptime mem.eql(u8, arch.name, tag_name)) " (native)\n" else "\n";
 
             try stdout.print("  {}{}", arch.name, native_str);
         }
@@ -794,8 +793,7 @@ fn cmdTargets(allocator: *Allocator, args: []const []const u8) !void {
         const systems = comptime meta.fields(builtin.Os);
         inline for (systems) |system| {
             // NOTE: Cannot use empty string, see #918.
-            comptime const native_str =
-                if (comptime mem.eql(u8, system.name, meta.tagName(builtin.os))) " (native)\n" else "\n";
+            comptime const native_str = if (comptime mem.eql(u8, system.name, meta.tagName(builtin.os))) " (native)\n" else "\n";
 
             try stdout.print("  {}{}", system.name, native_str);
         }
@@ -807,8 +805,7 @@ fn cmdTargets(allocator: *Allocator, args: []const []const u8) !void {
         const envs = comptime meta.fields(builtin.Environ);
         inline for (envs) |env| {
             // NOTE: Cannot use empty string, see #918.
-            comptime const native_str =
-                if (comptime mem.eql(u8, env.name, meta.tagName(builtin.environ))) " (native)\n" else "\n";
+            comptime const native_str = if (comptime mem.eql(u8, env.name, meta.tagName(builtin.environ))) " (native)\n" else "\n";
 
             try stdout.print("  {}{}", env.name, native_str);
         }

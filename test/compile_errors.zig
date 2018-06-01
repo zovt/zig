@@ -68,7 +68,8 @@ pub fn addCases(cases: *tests.CompileErrorContext) void {
         ".tmp_source.zig:3:12: error: expected type '[]const u8', found 'error{Foo}'",
     );
 
-    cases.add("returning error from void async function",
+    cases.add(
+        "returning error from void async function",
         \\const std = @import("std");
         \\export fn entry() void {
         \\    const p = async<std.debug.global_allocator> amain() catch unreachable;
@@ -352,7 +353,8 @@ pub fn addCases(cases: *tests.CompileErrorContext) void {
         ".tmp_source.zig:5:17: error: integer value 2 represents no error in 'Set2'",
     );
 
-    cases.add("duplicate error value in error set",
+    cases.add(
+        "duplicate error value in error set",
         \\const Foo = error {
         \\    Bar,
         \\    Bar,
@@ -3385,7 +3387,8 @@ pub fn addCases(cases: *tests.CompileErrorContext) void {
         ".tmp_source.zig:2:1: error: invalid character: '\\t'",
     );
 
-    cases.add("calling var args extern function, passing array instead of pointer",
+    cases.add(
+        "calling var args extern function, passing array instead of pointer",
         \\export fn entry() void {
         \\    foo("hello",);
         \\}
@@ -3807,12 +3810,10 @@ pub fn addCases(cases: *tests.CompileErrorContext) void {
         ".tmp_source.zig:7:24: error: accessing union field 'Bar' while field 'Baz' is set",
     );
 
-    cases.add(
-        "getting return type of generic function",
+    cases.add("getting return type of generic function",
         \\fn generic(a: var) void {}
         \\comptime {
         \\    _ = @typeOf(generic).ReturnType;
         \\}
-    ,
-        ".tmp_source.zig:3:25: error: ReturnType has not been resolved because 'fn(var)var' is generic");
+    , ".tmp_source.zig:3:25: error: ReturnType has not been resolved because 'fn(var)var' is generic");
 }

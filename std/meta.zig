@@ -195,8 +195,8 @@ pub fn isConst(comptime T: type) bool {
 }
 
 test "std.meta.isConst" {
-    debug.assert(!isConst(&u8));
-    debug.assert(isConst(&const u8));
+    debug.assert(!isConst(*u8));
+    debug.assert(isConst(*const u8));
     debug.assert(!isConst([]u8));
     debug.assert(isConst([]const u8));
 }
@@ -210,8 +210,8 @@ pub fn isVolatile(comptime T: type) bool {
 }
 
 test "std.meta.isConst" {
-    debug.assert(!isVolatile(&u8));
-    debug.assert(isVolatile(&volatile u8));
+    debug.assert(!isVolatile(*u8));
+    debug.assert(isVolatile(*volatile u8));
     debug.assert(!isVolatile([]u8));
     debug.assert(isVolatile([]volatile u8));
 }
@@ -225,8 +225,8 @@ pub fn alignment(comptime T: type) u32 {
 }
 
 test "std.meta.alignment" {
-    debug.assert(alignment(&align(1) u8) == 1);
-    debug.assert(alignment(&align(2) u8) == 2);
+    debug.assert(alignment(*align(1) u8) == 1);
+    debug.assert(alignment(*align(2) u8) == 2);
     debug.assert(alignment([]align(1) u8) == 1);
     debug.assert(alignment([]align(2) u8) == 2);
 }
@@ -244,7 +244,7 @@ pub fn Child(comptime T: type) type {
 
 test "std.meta.Child" {
     debug.assert(Child([1]u8) == u8);
-    debug.assert(Child(&u8) == u8);
+    debug.assert(Child(*u8) == u8);
     debug.assert(Child([]u8) == u8);
     debug.assert(Child(?u8) == u8);
     debug.assert(Child(promise->u8) == u8);
@@ -270,15 +270,27 @@ pub fn containerLayout(comptime T: type) TypeInfo.ContainerLayout {
 }
 
 test "std.meta.containerLayout" {
-    const E1 = enum { A };
-    const E2 = packed enum { A };
-    const E3 = extern enum { A };
-    const S1 = struct { };
-    const S2 = packed struct { };
-    const S3 = extern struct { };
-    const U1 = union { a: u8 };
-    const U2 = packed union { a: u8 };
-    const U3 = extern union { a: u8 };
+    const E1 = enum {
+        A,
+    };
+    const E2 = packed enum {
+        A,
+    };
+    const E3 = extern enum {
+        A,
+    };
+    const S1 = struct {};
+    const S2 = packed struct {};
+    const S3 = extern struct {};
+    const U1 = union {
+        a: u8,
+    };
+    const U2 = packed union {
+        a: u8,
+    };
+    const U3 = extern union {
+        a: u8,
+    };
 
     debug.assert(containerLayout(E1) == TypeInfo.ContainerLayout.Auto);
     debug.assert(containerLayout(E2) == TypeInfo.ContainerLayout.Packed);
@@ -304,18 +316,18 @@ test "std.meta.definitions" {
     const E1 = enum {
         A,
 
-        fn a() void { }
+        fn a() void {}
     };
     const S1 = struct {
-        fn a() void { }
+        fn a() void {}
     };
     const U1 = union {
         a: u8,
 
-        fn a() void { }
+        fn a() void {}
     };
 
-    const defs = comptime [][]TypeInfo.Definition {
+    const defs = comptime [][]TypeInfo.Definition{
         definitions(E1),
         definitions(S1),
         definitions(U1),
@@ -340,18 +352,18 @@ test "std.meta.defInfo" {
     const E1 = enum {
         A,
 
-        fn a() void { }
+        fn a() void {}
     };
     const S1 = struct {
-        fn a() void { }
+        fn a() void {}
     };
     const U1 = union {
         a: u8,
 
-        fn a() void { }
+        fn a() void {}
     };
 
-    const infos = comptime []TypeInfo.Definition {
+    const infos = comptime []TypeInfo.Definition{
         defInfo(E1, "a"),
         defInfo(S1, "a"),
         defInfo(U1, "a"),
@@ -363,15 +375,13 @@ test "std.meta.defInfo" {
     }
 }
 
-pub fn fields(comptime T: type)
-    switch (@typeInfo(T)) {
-        TypeId.Struct => []TypeInfo.StructField,
-        TypeId.Union => []TypeInfo.UnionField,
-        TypeId.ErrorSet => []TypeInfo.Error,
-        TypeId.Enum => []TypeInfo.EnumField,
-        else => @compileError("Expected struct, union, error set or enum type, found '" ++ @typeName(T) ++ "'"),
-    }
-{
+pub fn fields(comptime T: type) switch (@typeInfo(T)) {
+    TypeId.Struct => []TypeInfo.StructField,
+    TypeId.Union => []TypeInfo.UnionField,
+    TypeId.ErrorSet => []TypeInfo.Error,
+    TypeId.Enum => []TypeInfo.EnumField,
+    else => @compileError("Expected struct, union, error set or enum type, found '" ++ @typeName(T) ++ "'"),
+} {
     return switch (@typeInfo(T)) {
         TypeId.Struct => |info| info.fields,
         TypeId.Union => |info| info.fields,
@@ -382,10 +392,16 @@ pub fn fields(comptime T: type)
 }
 
 test "std.meta.fields" {
-    const E1 = enum { A };
-    const E2 = error { A };
-    const S1 = struct { a: u8 };
-    const U1 = union { a: u8 };
+    const E1 = enum {
+        A,
+    };
+    const E2 = error{A};
+    const S1 = struct {
+        a: u8,
+    };
+    const U1 = union {
+        a: u8,
+    };
 
     const e1f = comptime fields(E1);
     const e2f = comptime fields(E2);
@@ -404,15 +420,13 @@ test "std.meta.fields" {
     debug.assert(comptime uf[0].field_type == u8);
 }
 
-pub fn fieldInfo(comptime T: type, comptime field_name: []const u8)
-    switch (@typeInfo(T)) {
-        TypeId.Struct => TypeInfo.StructField,
-        TypeId.Union => TypeInfo.UnionField,
-        TypeId.ErrorSet => TypeInfo.Error,
-        TypeId.Enum => TypeInfo.EnumField,
-        else => @compileError("Expected struct, union, error set or enum type, found '" ++ @typeName(T) ++ "'"),
-    }
-{
+pub fn fieldInfo(comptime T: type, comptime field_name: []const u8) switch (@typeInfo(T)) {
+    TypeId.Struct => TypeInfo.StructField,
+    TypeId.Union => TypeInfo.UnionField,
+    TypeId.ErrorSet => TypeInfo.Error,
+    TypeId.Enum => TypeInfo.EnumField,
+    else => @compileError("Expected struct, union, error set or enum type, found '" ++ @typeName(T) ++ "'"),
+} {
     inline for (comptime fields(T)) |field| {
         if (comptime mem.eql(u8, field.name, field_name))
             return field;
@@ -422,10 +436,16 @@ pub fn fieldInfo(comptime T: type, comptime field_name: []const u8)
 }
 
 test "std.meta.fieldInfo" {
-    const E1 = enum { A };
-    const E2 = error { A };
-    const S1 = struct { a: u8 };
-    const U1 = union { a: u8 };
+    const E1 = enum {
+        A,
+    };
+    const E2 = error{A};
+    const S1 = struct {
+        a: u8,
+    };
+    const U1 = union {
+        a: u8,
+    };
 
     const e1f = comptime fieldInfo(E1, "A");
     const e2f = comptime fieldInfo(E2, "A");
@@ -446,8 +466,8 @@ pub fn ErrorSet(comptime T: type) type {
 }
 
 test "std.meta.ErrorSet" {
-    const E1 = error { };
-    const E2 = error { A };
+    const E1 = error{};
+    const E2 = error{A};
     debug.assert(ErrorSet(E1!u8) == E1);
     debug.assert(ErrorSet(E2!u8) == E2);
 }
@@ -458,8 +478,8 @@ pub fn Payload(comptime T: type) type {
 }
 
 test "std.meta.Payload" {
-    const E1 = error { };
-    const E2 = error { A };
+    const E1 = error{};
+    const E2 = error{A};
     debug.assert(Payload(E1!u8) == u8);
     debug.assert(Payload(E2!u16) == u16);
 }
@@ -471,18 +491,20 @@ pub fn callConvention(comptime T: type) TypeInfo.CallingConvention {
 
 test "std.meta.callConvention" {
     const Funcs = struct {
-        fn c() void { @setCold(true); }
+        fn c() void {
+            @setCold(true);
+        }
     };
 
-    debug.assert(callConvention(fn() void) == TypeInfo.CallingConvention.Unspecified);
-    debug.assert(callConvention(extern fn() void) == TypeInfo.CallingConvention.C);
+    debug.assert(callConvention(fn () void) == TypeInfo.CallingConvention.Unspecified);
+    debug.assert(callConvention(extern fn () void) == TypeInfo.CallingConvention.C);
 
     // TODO: This fails, but im not sure why
     //debug.assert(callConvention(@typeOf(Funcs.c)) == TypeInfo.CallingConvention.Cold);
 
-    debug.assert(callConvention(nakedcc fn() void) == TypeInfo.CallingConvention.Naked);
-    debug.assert(callConvention(stdcallcc fn() void) == TypeInfo.CallingConvention.Stdcall);
-    debug.assert(callConvention(async<&mem.Allocator> fn() void) == TypeInfo.CallingConvention.Async);
+    debug.assert(callConvention(nakedcc fn () void) == TypeInfo.CallingConvention.Naked);
+    debug.assert(callConvention(stdcallcc fn () void) == TypeInfo.CallingConvention.Stdcall);
+    debug.assert(callConvention(async<*mem.Allocator> fn () void) == TypeInfo.CallingConvention.Async);
 }
 
 pub fn isGeneric(comptime T: type) bool {
@@ -492,10 +514,10 @@ pub fn isGeneric(comptime T: type) bool {
 
 test "std.meta.isGeneric" {
     const Funcs = struct {
-        fn b(comptime T: type) void { }
+        fn b(comptime T: type) void {}
     };
 
-    debug.assert(!isGeneric(fn() void));
+    debug.assert(!isGeneric(fn () void));
     debug.assert(isGeneric(@typeOf(Funcs.b)));
 }
 
@@ -505,8 +527,8 @@ pub fn isVarArgs(comptime T: type) bool {
 }
 
 test "std.meta.isVarArgs" {
-    debug.assert(!isVarArgs(fn() void));
-    debug.assert(isVarArgs(fn(...) void));
+    debug.assert(!isVarArgs(fn () void));
+    debug.assert(isVarArgs(fn (...) void));
 }
 
 pub fn ReturnType(comptime T: type) type {
@@ -515,8 +537,8 @@ pub fn ReturnType(comptime T: type) type {
 }
 
 test "std.meta.ReturnType" {
-    debug.assert(ReturnType(fn() void) == void);
-    debug.assert(ReturnType(fn() u8) == u8);
+    debug.assert(ReturnType(fn () void) == void);
+    debug.assert(ReturnType(fn () u8) == u8);
 }
 
 pub fn AsyncAllocatorType(comptime T: type) type {
@@ -525,7 +547,7 @@ pub fn AsyncAllocatorType(comptime T: type) type {
 }
 
 test "std.meta.AsyncAllocatorType" {
-    debug.assert(AsyncAllocatorType(async<&mem.Allocator> fn() void) == &mem.Allocator);
+    debug.assert(AsyncAllocatorType(async<*mem.Allocator> fn () void) == *mem.Allocator);
 }
 
 pub fn args(comptime T: type) []TypeInfo.FnArg {
@@ -534,7 +556,7 @@ pub fn args(comptime T: type) []TypeInfo.FnArg {
 }
 
 test "std.meta.args" {
-    const aargs = comptime args(fn(u8) void);
+    const aargs = comptime args(fn (u8) void);
 
     debug.assert(aargs.len == 1);
     debug.assert(comptime aargs[0].arg_type == u8);
