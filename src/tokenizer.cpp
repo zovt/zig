@@ -18,7 +18,8 @@
 #define WHITESPACE \
          ' ': \
     case '\r': \
-    case '\n'
+    case '\n': \
+    case '\t'
 
 #define DIGIT_NON_ZERO \
          '1': \

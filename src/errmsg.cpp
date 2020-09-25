@@ -73,7 +73,12 @@ static void print_err_msg_type(ErrorMsg *err, ErrColor color, ErrType err_type) 
         // Show the referenced line
         fprintf(stderr, "%s\n", buf_ptr(&err->line_buf));
         for (size_t i = 0; i < err->column_start; i += 1) {
-            fprintf(stderr, " ");
+            char c = (buf_ptr(&err->line_buf))[i];
+            if (c == '\t') {
+                fprintf(stderr, "\t");
+            } else {
+                fprintf(stderr, " ");
+            }
         }
         // Draw the caret
         if (use_colors) os_stderr_set_color(TermColorGreen);
